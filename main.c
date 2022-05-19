@@ -20,10 +20,10 @@
 #include "ch.h"
 #include "hal.h"
 
-#include "shell.h"
+//#include "shell.h"
 #include "chprintf.h"
 
-#include "usbcfg.h"
+//#include "usbcfg.h"
 
 /*===========================================================================*/
 /* Command line related.                                                     */
@@ -32,54 +32,55 @@
 #define SHELL_WA_SIZE   THD_WORKING_AREA_SIZE(2048)
 
 /* Can be measured using dd if=/dev/xxxx of=/dev/null bs=512 count=10000.*/
-static void cmd_write(BaseSequentialStream *chp, int argc, char *argv[]) {
-  static uint8_t buf[] =
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+//static void cmd_write(BaseSequentialStream *chp, int argc, char *argv[]) {
+//  static uint8_t buf[] =
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+//      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+//
+//  (void)argv;
+//  if (argc > 0) {
+//    chprintf(chp, "Usage: write\r\n");
+//    return;
+//  }
 
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: write\r\n");
-    return;
-  }
+//  while (chnGetTimeout((BaseChannel *)chp, TIME_IMMEDIATE) == Q_TIMEOUT) {
+//#if 1
+//    /* Writing in channel mode.*/
+//    chnWrite(&SDU1, buf, sizeof buf - 1);
+//#else
+//    /* Writing in buffer mode.*/
+//    (void) obqGetEmptyBufferTimeout(&SDU1.obqueue, TIME_INFINITE);
+//    memcpy(SDU1.obqueue.ptr, buf, SERIAL_USB_BUFFERS_SIZE);
+//    obqPostFullBuffer(&SDU1.obqueue, SERIAL_USB_BUFFERS_SIZE);
+//#endif
+//  }
+//  chprintf(chp, "\r\n\nstopped\r\n");
+//}
 
-  while (chnGetTimeout((BaseChannel *)chp, TIME_IMMEDIATE) == Q_TIMEOUT) {
-#if 1
-    /* Writing in channel mode.*/
-    chnWrite(&SDU1, buf, sizeof buf - 1);
-#else
-    /* Writing in buffer mode.*/
-    (void) obqGetEmptyBufferTimeout(&SDU1.obqueue, TIME_INFINITE);
-    memcpy(SDU1.obqueue.ptr, buf, SERIAL_USB_BUFFERS_SIZE);
-    obqPostFullBuffer(&SDU1.obqueue, SERIAL_USB_BUFFERS_SIZE);
-#endif
-  }
-  chprintf(chp, "\r\n\nstopped\r\n");
-}
+//static const ShellCommand commands[] = {
+//  {"write", cmd_write},
+//  {NULL, NULL}
+//};
+//
+//static const ShellConfig shell_cfg1 = {
+//  (BaseSequentialStream *)&SDU1,
+//  commands
+//};
 
-static const ShellCommand commands[] = {
-  {"write", cmd_write},
-  {NULL, NULL}
-};
-
-static const ShellConfig shell_cfg1 = {
-  (BaseSequentialStream *)&SDU1,
-  commands
-};
 
 /*===========================================================================*/
 /* Generic code.                                                             */
@@ -94,13 +95,28 @@ static __attribute__((noreturn)) THD_FUNCTION(Thread1, arg) {
   (void)arg;
   chRegSetThreadName("blinker");
   while (true) {
-    systime_t time = serusbcfg.usbp->state == USB_ACTIVE ? 1000 : 1500;
+    //systime_t time = serusbcfg.usbp->state == USB_ACTIVE ? 1000 : 1500;
     //palSetPad(GPIOB, GPIOB_LED);
-    chThdSleepMilliseconds(time);
-    //palClearPad(GPIOB, GPIOB_LED);
-    chThdSleepMilliseconds(time);
+//    sdWrite(&SD1, (uint8_t *)"Example: 1\r\n", 12);
+//    chThdSleepMilliseconds(time);
+//    //palClearPad(GPIOB, GPIOB_LED);
+    //sdWrite(&SD3, (uint8_t *)"Example: 1\r\n", 12);
+    //sdWrite(&SD1, (uint8_t *)"Example: 1\r\n", 12);
+	  palSetPad(GPIOB, 6);
+    chThdSleepMilliseconds(1500);
+    palClearPad(GPIOB, 6);
+    chThdSleepMilliseconds(1500);
+    //sdWrite(&SD3, (uint8_t *)"Example: 1\r\n", 12);
   }
 }
+
+//static SerialConfig sd2cfg = {
+//    115200,                                 /* 115200 baud rate */
+//    USART_CR1_9BIT_WORD | USART_CR1_PARITY_SET | USART_CR1_EVEN_PARITY,
+//    USART_CR2_STOP1_BITS | USART_CR2_LINEN,
+//    0
+//};
+
 
 /*
  * Application entry point.
@@ -117,26 +133,46 @@ int main(void) {
   halInit();
   chSysInit();
 
+  	  //palSetPadMode(GPIOB, 6, PAL_MODE_ALTERNATE(1));
+  	  //palSetPadMode(GPIOB, 7, PAL_MODE_ALTERNATE(1));
+//  palSetPadMode(GPIOB, 10, PAL_MODE_ALTERNATE(1));
+//  palSetPadMode(GPIOB, 11, PAL_MODE_ALTERNATE(1));
+
   /*
    * Initializes a serial-over-USB CDC driver.
    */
-  sduObjectInit(&SDU1);
-  sduStart(&SDU1, &serusbcfg);
+  //sduObjectInit(&SDU1);
+  //sduStart(&SDU1, &serusbcfg);
+  SerialConfig usartconfig;
+    usartconfig.speed=57600;
+
+    //sduObjectInit(&SDU1);
+    //sdObjectInit(sdp, inotify, onotify)
+    //sdStart(&SD1, &usartconfig);
+
+    //sdStart(&SD3, &usartconfig);
+    sdStart(&SD3, NULL);
+    palSetPadMode(GPIOB, 10, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
+    //palSetPadMode(GPIOB, 10, PAL_MODE_STM32_ALTERNATE_OPENDRAIN);
+      //palSetPadMode(GPIOB, 11, PAL_MODE_STM32_ALTERNATE_PUSHPULL);
+    //sdStart(&SD3, NULL);
+
+  //sdStart(&SD1, &usartconfig);
 
   /*
    * Activates the USB driver and then the USB bus pull-up on D+.
    * Note, a delay is inserted in order to not have to disconnect the cable
    * after a reset.
    */
-  usbDisconnectBus(serusbcfg.usbp);
+  //usbDisconnectBus(serusbcfg.usbp);
   chThdSleepMilliseconds(1500);
-  usbStart(serusbcfg.usbp, &usbcfg);
-  usbConnectBus(serusbcfg.usbp);
+  //usbStart(serusbcfg.usbp, &usbcfg);
+  //usbConnectBus(serusbcfg.usbp);
 
   /*
    * Shell manager initialization.
    */
-  shellInit();
+//  shellInit();
 
   /*
    * Creates the blinker thread.
@@ -147,12 +183,18 @@ int main(void) {
    * Normal main() thread activity, spawning shells.
    */
   while (true) {
-    if (SDU1.config->usbp->state == USB_ACTIVE) {
-      thread_t *shelltp = chThdCreateFromHeap(NULL, SHELL_WA_SIZE,
-                                              "shell", NORMALPRIO + 1,
-                                              shellThread, (void *)&shell_cfg1);
-      chThdWait(shelltp);               /* Waiting termination.             */
-    }
+//    if (SDU1.config->usbp->state == USB_ACTIVE) {
+//      thread_t *shelltp = chThdCreateFromHeap(NULL, SHELL_WA_SIZE,
+//                                              "shell", NORMALPRIO + 1,
+//                                              shellThread, (void *)&shell_cfg1);
+//      chThdWait(shelltp);               /* Waiting termination.             */
+//    }
+
     chThdSleepMilliseconds(1000);
+    sdWrite(&SD3, (uint8_t *)"Example: 1\r\n", 12);
+    //sdWrite(&SD1, (uint8_t *)"Example: 1\r\n", 12);
+    //    chThdSleepMilliseconds(time);
+    //palClearPad(GPIOB, 10);
+    //sdWrite(&SD3, (uint8_t *)"Example: 1\r\n", 12);
   }
 }

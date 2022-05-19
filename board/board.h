@@ -30,7 +30,7 @@
 /*
  * Board frequencies.
  */
-#define STM32_LSECLK            32768
+//#define STM32_LSECLK            32768
 #define STM32_HSECLK            8000000
 
 /*
@@ -52,10 +52,10 @@
 
 /* on-board */
 
-#define GPIOC_LED               13
+//#define GPIOB_LED               6
 
-#define GPIOA_USBDM             11      // pin 8
-#define GPIOA_USBDP             12      // pin 9
+//#define GPIOA_USBDM             11      // pin 8
+//#define GPIOA_USBDP             12      // pin 9
 
 #define GPIOC_OSC32_IN          14
 #define GPIOC_OSC32_OUT         15
