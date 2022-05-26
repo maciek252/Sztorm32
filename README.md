@@ -45,9 +45,14 @@ The connections with the MCU are (pin labels for STM32F103):
 
 
 
-### pinout 
+### inter-module connections pinout
+
+Yaw<->Roll:    TX RX GND GND +3.3V +3.3V +VBAT +VBAT
+Roll<->Pitch   TX RX GND GND +3.3V +VBAT
+Pitch<->IMU    to be checked, it's SPI + 3.3V + GND
+
+### LEDs
+
+There are two LEDs. Don't know yet if they are connected to the ESP32 or to some minor chips controlling the power switching. None of them seems to be connected to the STM32 MCU.
 
 ### Known issues
-
-
-
