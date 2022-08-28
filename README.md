@@ -22,6 +22,18 @@ The connections with the MCU are (pin labels for STM32F103):
 - AM2827 motor controller: 3-PWM for controlling the phases, 3PWMs for disabling the stand-by (high impedance) for every phase, PA8, PA9, PA10 for PWMs, PB13, PB14, PB15 for complementary PWMs enabling the driver
 - current sensors: two resistor sensors + an operational amplifier, the MCU pins PA0 and PA4
 
+### the pitch board
+
+
+- MQ730 magnetic encoder: SPI1 (PA6: MISO, PA7: MOSI, PA5: SCK), PA1 as the chip select (CS)
+- AM2827 motor controller: 3-PWM for controlling the phases, 3PWMs for disabling the stand-by (high impedance) for every phase, PA8, PA9, PA10 for PWMs, PB13, PB14, PB15 for complementary PWMs enabling the driver
+- current sensors: two resistor sensors + an operational amplifier, the MCU pins PA0 and PA4
+- IMU: MPU6500
+    SDO -> PB4
+    SDA/SDI -> PB5
+    SCL/SCK -> PB3
+    CS -> PB8
+- Serial - 
 
 ### the development plan
 
@@ -56,3 +68,54 @@ Pitch<->IMU    to be checked, it's SPI + 3.3V + GND
 There are two LEDs. Don't know yet if they are connected to the ESP32 or to some minor chips controlling the power switching. None of them seems to be connected to the STM32 MCU.
 
 ### Known issues
+
+
+### The WG2X protocol between the "motherboard" and the VROOM ESP32
+
+baudrate: 115200
+
+The general format of a frame (in both directions):
+
+(an example frame)
+
+A5 5A 02 0D 03 0D 64 00 59 B4
+
+A5 5A - the start marker
+02 0D - the id (maybe it has some structure)
+03 - number of the argument bytes
+0D 64 00 - the arguments
+59 B4 - the CRC16-XMODEM checksum (without the start marker)
+
+
+#### ESP32->the gimbal's STM32F103
+
+001005ff00000000 - start sending telemetry (gimbal status)
+0010050000000000 - stop sending TM
+
+00110500FF000000 - joystick move yaw right (clockwise)
+0011059000FF0000 - joystick move yaw left (anticlockwise)
+
+00110590000000FF - joystick move pitch down
+001105900000FF00 - joystick move pitch up
+
+(with joystick the balance of the contradictive directions is taken, for example xxxxxxFFFF makes no pitch move)
+
+020D0323F100 - adjust the horizon 
+
+setting the motor strength 
+
+A5 5A 02 0D 03 07 VAL1 VAL2
+
+07, 08, 09 - yaw, roll, pitch (to verify the order)
+
+#### the gimbal's STM32F103 -> ESP32
+
+A5 5A 03 10 08 01 
+
+A3 35 - pitch pos
+
+C8 02 - roll pos
+
+F5 BB B8 - yaw pos
+
+CRC1 CRC2
