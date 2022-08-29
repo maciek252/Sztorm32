@@ -123,3 +123,9 @@ CRC1 CRC2
 ### Sztorm32-Lite
 
 This is a simplified version of the project, not changing the internal WG2X implementation of the gimbal part, but taking over the control.
+
+The project aims to provide a dedicated firmware for ESP32 Vroom. At the current stage, it is possible to receive the gimbal status and issue commands by an USB-TTL interface, soldered as explained in the following photo:
+
+![Alt text](photo/WG2Xboard.jpg?raw=true "Title")
+
+
