@@ -119,3 +119,7 @@ C8 02 - roll pos
 F5 BB B8 - yaw pos
 
 CRC1 CRC2
+
+### Sztorm32-Lite
+
+This is a simplified version of the project, not changing the internal WG2X implementation of the gimbal part, but taking over the control.
