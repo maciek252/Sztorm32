@@ -108,7 +108,9 @@ A5 5A 02 0D 03 07 VAL1 VAL2
 
 07, 08, 09 - yaw, roll, pitch (to verify the order)
 
-#### the gimbal's STM32F103 -> ESP32
+#### the gimbal's STM32F103 -> ESP32 (gimbal status)
+
+a telemetry frame:
 
 A5 5A 03 10 08 01 
 
