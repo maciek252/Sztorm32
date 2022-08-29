@@ -128,4 +128,5 @@ The project aims to provide a dedicated firmware for ESP32 Vroom. At the current
 
 ![Alt text](photo/WG2Xboard.jpg?raw=true "Title")
 
+after connecting the interface and selecting the baudrate of 115200, the python script Sztorm32-Lite/pyserial1.py can be used for issuing commands, and the telemetry from the gimbal will be received.
 
