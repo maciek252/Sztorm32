@@ -90,9 +90,12 @@ A5 5A - the start marker
 #### ESP32->the gimbal's STM32F103
 
 001005ff00000000 - start sending telemetry (gimbal status)
+
 0010050000000000 - stop sending TM
 
-00110500FF000000 - joystick move yaw right (clockwise)
+00110500FF000000 - joystick move yaw right (clockwise) 
+FF is the force applied, between FF and 00
+
 0011059000FF0000 - joystick move yaw left (anticlockwise)
 
 00110590000000FF - joystick move pitch down
