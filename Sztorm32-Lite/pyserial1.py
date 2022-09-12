@@ -22,7 +22,7 @@ values = bytearray([0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 ,0x58 ,0x02 ,0x71 ,0x6
 #hexString =  "0011059000FF0000" # ok dziala there is some inertion
 #hexString = "00110590000000FF" # ok  xx xx xx xx FF - pitch down
 #hexString = "001105900000FF00" # ok xx xx xx FF xx - pitch up
-hexString = "0011059000FF0000" # ok xx xx FF xx xx - yaw left
+#hexString = "0011059000FF0000" # ok xx xx FF xx xx - yaw left
 #hexString = "00110500FF000000" # ok xx FF xx xx xx - yaw right
 #hexString = "001200" # 
 #hexString = "001105FF00000000" # ok FF xx xx xx xx - CONTINUE? STOP?
@@ -33,7 +33,7 @@ hexString = "0011059000FF0000" # ok xx xx FF xx xx - yaw left
 #hexString = "0011059FF00AF000" # ok yaw fast left
 #hexString = "0011059FFFFAF000" # ok yaw fast right
 #A5 5A 00 10 05 FF 00 00 00 00 D5 2E #?
-#hexString = "001005ff00000000"  # starts TM from the gimbal!
+hexString = "001005ff00000000"  # starts TM from the gimbal!
 #hexString = "0010050000000000"  # stops TM from the gimbal!
 #hexString = "0011059FFFFAF0F0" # 
 #hexString = "0012059FFFFAF0F0" # 
