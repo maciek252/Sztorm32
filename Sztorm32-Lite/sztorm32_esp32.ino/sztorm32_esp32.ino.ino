@@ -46,11 +46,21 @@ Crc16 crc2;
 //const unsigned char command[] = {0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 ,0x58 ,0x02 ,0x71 ,0x67}; 
 const char commandShort[] = {0x00 , 0x11 , 0x05 , 0xff ,0x2d ,0x00, 0x00,0x00}; 
 const char command[] = {0xA5, 0x5A, 0x00 , 0x11 , 0x05 , 0xff ,0x2d ,0x00, 0x00,0x00 ,0x7c ,0x98}; 
+const char commandStartTm[] = {0x00 , 0x10 , 0x05 , 0xff ,0x00 ,0x00, 0x00,0x00}; 
+//001005ff00000000
+const char commandHeader[] = {0xA5, 0x5A};
 #define RXD2 16
 #define TXD2 17
 
 int sendCounter = 0;
- 
+
+int receiveCounter = 0;
+int receiveEffectiveCounter = 0;
+int receiveLength = 0;
+int messageFirstByte = 0;
+int messageSecondByte = 0;
+uint8_t yawFirstByte = 0;
+uint8_t yawSecondByte = 0;
 HardwareSerial gps_serial(2);
 uCRC16XModemLib crc;
 
@@ -80,7 +90,66 @@ void setup() {
 
 // the loop function runs over and over again forever
 void loop() {
-  
+
+byte bajty[30];  
+int  serIn;
+if(gps_serial.available()) {    
+    //inform that Arduino heard you saying something
+    //Serial.print("Arduino heard you say: ");
+    
+    //keep reading and printing from serial untill there are bytes in the serial buffer
+     while (gps_serial.available()>0){
+        serIn = gps_serial.read();  //read Serial                
+         //Serial.println(serIn, HEX);
+        if(serIn == 0xA5){
+          Serial.print("poczatek ramki!");
+          receiveCounter = 1;
+          continue;          
+        } else if (serIn == 0x5A and receiveCounter == 1){
+          Serial.print("frame second byte!");
+          receiveCounter = 2;
+          continue;
+        } else if (receiveCounter == 2){
+          receiveCounter++;          
+          messageFirstByte = (int) serIn;
+          continue;
+        } else if (receiveCounter == 3){
+          receiveCounter++;          
+          messageSecondByte = (int) serIn;
+          continue;        
+        } else if (receiveCounter == 4){
+          receiveLength = (int) serIn;
+          Serial.print(receiveLength);
+          receiveCounter++;
+          continue;
+        }
+
+        if(receiveCounter == 6)
+          yawSecondByte = (uint8_t) serIn;
+        if(receiveCounter == 7)
+          yawFirstByte = (uint8_t) serIn;
+
+        if(receiveLength > 0){
+          receiveLength--;
+          receiveCounter++;
+
+          if(receiveLength == 0){
+            
+            if(messageFirstByte == 0x03 && messageSecondByte == 0x10){
+              //int poz = yawFirstByte << 8 + yawSecondByte;                                    
+              //int poz = yawFirstByte << 8 ;
+              int poz = (int)((int8_t)yawFirstByte); // this should sign extend the number
+              poz <<= 8;
+              Serial.print("pozycja!\n");
+              Serial.print( poz );
+            }
+            Serial.print("message parsed (without the CRC)\n");
+          }
+        }
+        
+     }
+}
+
   
   digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
   digitalWrite(LED_BUILTIN2, HIGH);   // turn the LED on (HIGH is the voltage level)
@@ -88,19 +157,46 @@ void loop() {
   digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
   digitalWrite(LED_BUILTIN2, LOW);    // turn the LED off by making the voltage LOW
   delay(1000);                       // wait for a second
-  if(sendCounter<100){
-    sendCounter++;
-    gps_serial.write( (uint8_t*)command, sizeof(command) );
-  }
+  
+  
+  
   crc2.clearCrc();
-  for(int j = 0; j < sizeof(commandShort); j++){
-    crc2.updateCrc(commandShort[j]);    
+  for(int j = 0; j < sizeof(commandStartTm); j++){
+    crc2.updateCrc(commandStartTm[j]);    
   }
   unsigned short value = crc2.getCrc();
     Serial.print("crc = 0x");
     Serial.println(value, HEX);
+  if(sendCounter < 5){
+    gps_serial.write( (uint8_t*)commandHeader, sizeof(commandHeader) );
+    gps_serial.write( (uint8_t*)commandStartTm, sizeof(commandStartTm) );
+    byte* b;
+    b = (byte*) &value;
+    gps_serial.write( b[0] );
+    gps_serial.write( b[1] );
+  }
+
+  crc2.clearCrc();
+  for(int j = 0; j < sizeof(commandShort); j++){
+    crc2.updateCrc(commandShort[j]);    
+  }
+  value = crc2.getCrc();
+    Serial.print("crc = 0x");
+    Serial.println(value, HEX);
+
+  if(sendCounter<100){
+    
+    sendCounter++;
+    gps_serial.write( (uint8_t*)commandHeader, sizeof(commandHeader) );
+    gps_serial.write( (uint8_t*)commandShort, sizeof(commandShort) );
+    byte* b;
+    b = (byte*) &value;
+    gps_serial.write( b[0] );
+    gps_serial.write( b[1] );
+  }
   
   uint16_t i = crc.calculate(commandShort, 2);
   Serial.println(i, HEX);
-  
+  const char *p_buf = "abcd";
+  const unsigned int *p_int = reinterpret_cast< const unsigned int * >( p_buf );
 }

@@ -33,7 +33,7 @@ values = bytearray([0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 ,0x58 ,0x02 ,0x71 ,0x6
 #hexString =  "0011059000FF0000" # ok dziala there is some inertion
 #hexString = "00110590000000FF" # ok  xx xx xx xx FF - pitch down
 #hexString = "001105900000FF00" # ok xx xx xx FF xx - pitch up
-hexString = "0011059000FF0000" # ok xx xx FF xx xx - yaw left
+#hexString = "0011059000FF0000" # ok xx xx FF xx xx - yaw left
 #hexString = "00110500FF000000" # ok xx FF xx xx xx - yaw right
 #hexString = "001200" # 
 #hexString = "001105FF00000000" # ok FF xx xx xx xx - CONTINUE? STOP?
@@ -50,6 +50,7 @@ hexString = "0011059000FF0000" # ok xx xx FF xx xx - yaw left
 #hexString = "0012059FFFFAF0F0" # 
 #hexStringWithCRC = "020d03165802"
 #hexString = "020D0300F000" # horizon
+hexString = "020E010B" # question about joystick sliders?
 prefix= "A55A"
 b = bytes.fromhex(hexString)
 barr = bytearray.fromhex(hexString)
@@ -75,8 +76,42 @@ sum = barrPrefix + barr + bytearray.fromhex(crsStr) #+ c1.to_bytes(2, 'big') + c
 
 print(sum)
 #ser.write(barrWithCrc)
-ser.write(sum)
+#ser.write(sum)
 #ser.close()             # close port
+
+
+
+def sendCommand(hexString):
+    prefix= "A55A"
+    b = bytes.fromhex(hexString)
+    barr = bytearray.fromhex(hexString)
+    barrPrefix = bytearray.fromhex(prefix)
+    barr = bytearray.fromhex(hexString)
+    #barrWithCrc = bytearray.fromhex(hexStringWithCRC)
+    #crc = crc16.crc16xmodem(b'\x02\x0D\x03\x16\x58\x02') # dobre!
+    crc = crc16.crc16xmodem(b)
+
+    print(crc)
+    print(hex(crc))
+    crcCale = hex(crc)
+    print(hex(crc & 0xFF))
+    print(hex((crc>>8) & 0xFF))
+    print(barr)
+
+    print(values)
+    c1 = (crc & 0xFF)
+    c2 = (crc>>8) & 0xFF
+    crsStr = f'{c1:x}' + f'{c2:x}'
+    sum = barrPrefix + barr + bytearray.fromhex(crsStr) #+ c1.to_bytes(2, 'big') + c2.to_bytes(2, 'big')
+
+
+    print(sum)
+    #ser.write(barrWithCrc)
+    ser.write(sum)
+
+def moveGimbalYaw(destAngle, direction):
+    hexString = "0011059FF00AF000"
+    sendCommand(hexString)
 
 console = Console()
 
@@ -132,6 +167,12 @@ def interpretFrame(bajty):
     if(bajty[2] == 0x03 and bajty[3] == 0x10):
      #   print("pozycja!")
         i = 43
+    elif(bajty[2] == 0x03 and bajty[3] == 0x0E):        
+        wlacznik = bajty[5]
+        stan = bajty[7]
+        print("answer about joystick!: " + str(wlacznik) + "/" + str(stan))
+        
+        #03 0E 04 0A 00 02 00
     else:
         return    
     #pos = struct.unpack(bytes(ctypes.c_ubyte(bajty[6])), bytes(ctypes.c_ubyte(bajty[7])))
@@ -156,15 +197,19 @@ while True:
         bajty += line
         if( parseFrame(bajty) == True):            
             interpretFrame(bajty)
-            
-            licznik = "" + str( (bajty[7]&0b01111111) * 256 + (bajty[6]&0b11111111)) + " " + str((bajty[7]&0b01111111) * 256 + bajty[6]*1) + " " + str(bajty[6])
+            continue
+            licznik = ""
+            #licznik = "" + str( (bajty[7]&0b01111111) * 256 + (bajty[6]&0b11111111)) + " " + str((bajty[7]&0b01111111) * 256 + bajty[6]*1) + " " + str(bajty[6])
             
 
-            if(bajty[7] & 0b10000000):
+            # if(bajty[7] & 0b10000000):
                 
-                licznik = "" + str( (bajty[7]&0b01111111) * 256 + (bajty[6]&0b11111111)) + " " + str((bajty[7]&0b01111111) * 256 - bajty[6]*1) + " " + str(bajty[6])
-                wyn = int.from_bytes([bajty[7]], "little", signed=True)
-                licznik += "MINUS" + str(wyn * 256)
+            #     licznik = "" + str( (bajty[7]&0b01111111) * 256 + (bajty[6]&0b11111111)) + " " + str((bajty[7]&0b01111111) * 256 - bajty[6]*1) + " " + str(bajty[6])
+            
+            #     licznik += "MINUS  " 
+
+            wyn = int.from_bytes([bajty[7]], "little", signed=True)
+            licznik += "   /" + str(wyn * 256)
 
             licznikRoll = "" + str( (bajty[9]&0b01111111) * 256 + (bajty[8]&0b11111111)) + " " + str((bajty[9]&0b01111111) * 256 + bajty[8]*1) + " " + str(bajty[8])
             
@@ -173,16 +218,21 @@ while True:
                 licznikRoll = "" + str( (bajty[9]&0b01111111) * 256 + (bajty[8]&0b11111111)) + " " + str((bajty[9]&0b01111111) * 256 - bajty[8]*1) + " " + str(bajty[8])
                 licznikRoll += "MINUS"
 
-            licznikYaw = "" + str( (bajty[11]&0b01111111) * 256 + (bajty[10]&0b11111111)) + " " + str((bajty[11]&0b01111111) * 256 + bajty[10]*1) + " " + str(bajty[10])
+            licznikYaw = ""
+            #licznikYaw = "" + str( (bajty[11]&0b01111111) * 256 + (bajty[10]&0b11111111)) + " " + str((bajty[11]&0b01111111) * 256 + bajty[10]*1) + " " + str(bajty[10])
             
-            if(bajty[11] & 0b10000000):
+            # if(bajty[11] & 0b10000000):
                 
-                licznikYaw = "" + str( (bajty[11]&0b01111111) * 256 + (bajty[10]&0b11111111)) + " " + str((bajty[11]&0b01111111) * 256 - bajty[10]*1) + " " + str(bajty[10])
-                licznikYaw += "MINUS"
+            #     licznikYaw = "" + str( (bajty[11]&0b01111111) * 256 + (bajty[10]&0b11111111)) + " " + str((bajty[11]&0b01111111) * 256 - bajty[10]*1) + " " + str(bajty[10])
+            #     licznikYaw += "MINUS"
+
+            wyn = int.from_bytes([bajty[11]], "little", signed=True)
+            licznikYaw += "   /" + str(wyn * 256)
 
 
             bajty = []    
         #licznik += " " + line.hex()
         console.print(format.format(datetime.strftime(datetime.now(), "%H:%M:%S"), licznik, licznikRoll, licznikYaw))
+        moveGimbalYaw(10,False)
     #sleep(0.5)
 
