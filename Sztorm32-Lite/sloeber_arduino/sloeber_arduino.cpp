@@ -37,8 +37,7 @@ Crc16 crc2;
 // 34, 35 - no led
 // 21 lub 32 - blue z przodu, mruga!
 // 33 lub 25 - czerwona z boku!
-#define LED_BUILTIN 33orien
-
+#define LED_BUILTIN 33
 #define LED_BUILTIN2 25
 
 //orientacja:
@@ -55,7 +54,6 @@ Crc16 crc2;
 // roll:
 // horizontal: 0
 // motor up: 45 // motor down: -45
-
 
 //0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 , 0xBC , 0x02 , 0x07 , 0xBB
 //0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 ,0x58 ,0x02 ,0x71 ,0x67
@@ -81,8 +79,12 @@ const uint8_t commandHeader[] = { 0xA5, 0x5A };
 #define TXD2 17
 
 int sendCounter = 0;
+bool isMoving = false;
+double desiredYaw = 0;
 
 long sendTime = 0;
+long moveTime = 0;
+
 int receiveCounter = 0;
 int receiveEffectiveCounter = 0;
 int receiveLength = 0;
@@ -98,7 +100,6 @@ uint8_t yawSecondByte = 0;
 HardwareSerial gps_serial(2);
 uCRC16XModemLib crc;
 
-
 class GimbalState {
 public:
 	double yaw;
@@ -106,7 +107,6 @@ public:
 	double pitch;
 
 };
-
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -139,7 +139,8 @@ double feyiuAngleTo360(double angle) {
 }
 
 void setYaw(double desiredAngle) {
-
+	desiredYaw = desiredAngle;
+	isMoving = true;
 }
 
 int decodeTwoBytesInt(int8_t firstByte, int8_t secondByte) {
@@ -153,7 +154,6 @@ int decodeTwoBytesInt(int8_t firstByte, int8_t secondByte) {
 
 	return result;
 }
-
 
 //GimbalState gimbalState
 bool getGimbalState(GimbalState &g) {
@@ -239,17 +239,17 @@ bool getGimbalState(GimbalState &g) {
 //						Serial.print(yawFirstByte);
 //						Serial.print(" ");
 //						Serial.print(yawSecondByte);
-						Serial.print("\npos!\n");
-						Serial.print(posPitch);
-						Serial.print(" ");
-						Serial.print(posRoll);
-						Serial.print(" ");
-						Serial.print(posYaw);
+//						Serial.print("\npos!\n");
+//						Serial.print(posPitch);
+//						Serial.print(" ");
+//						Serial.print(posRoll);
+//						Serial.print(" ");
+//						Serial.print(posYaw);
 
-						g.yaw = ((double)posYaw )/ 100.0;
-						g.roll = ((double)posRoll) / 100.0;
-						g.pitch = ((double)posPitch) / 100.0;
-						Serial.print("message parsed (without the CRC)\n");
+						g.yaw = ((double) posYaw) / 100.0;
+						g.roll = ((double) posRoll) / 100.0;
+						g.pitch = ((double) posPitch) / 100.0;
+						//Serial.print("message parsed (without the CRC)\n");
 						return true;
 					}
 
@@ -282,12 +282,10 @@ void sendCommand(const uint8_t *command, int length) {
 
 }
 
-
 // the loop function runs over and over again forever
 void loop() {
 
 	byte bajty[30];
-
 
 	GimbalState g;
 	//bool wynik = true;
@@ -298,8 +296,45 @@ void loop() {
 		Serial.print(" ");
 		Serial.print(g.roll);
 		Serial.print(" ");
-		Serial.print(g.yaw);
+		double yaw360 = feyiuAngleTo360(g.yaw);
+		Serial.print(yaw360);
+		Serial.print(" des=");
+		Serial.print(desiredYaw);
+
 		Serial.print("\n");
+
+		if (!isMoving && (millis() - moveTime > 5000)) {
+			moveTime = millis();
+			isMoving = true;
+
+			desiredYaw = yaw360 + 40.0;
+			if (desiredYaw > 360.0)
+				desiredYaw -= 360.0;
+
+			Serial.print(
+					"@@@@@@@@@@@@@@@@@@@@@!!DESIRED=");
+			Serial.print(desiredYaw);
+			Serial.print("!\n");
+		}
+
+		if (isMoving && (millis() - sendTime > 500)) {
+			sendTime = millis();
+			//if (sendCounter < 400) {
+
+			if (abs(desiredYaw - yaw360) > 10) {
+				sendCommand(commandShort, 8);
+				Serial.print(
+						"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
+			} else {
+				Serial.print(
+						"=========================== TARGET!!==========================!\n");
+				isMoving = false;
+				moveTime = millis();
+			}
+
+			//sendCounter++;
+
+		}
 
 	}
 
@@ -315,16 +350,6 @@ void loop() {
 		sendCounter++;
 	} else
 		sendCounter = 0;
-
-	if (millis() - sendTime > 500) {
-		sendTime = millis();
-		//if (sendCounter < 400) {
-
-		//sendCounter++;
-		Serial.print(
-				"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
-		sendCommand(commandShort, 8);
-	}
 
 	const char *p_buf = "abcd";
 	const unsigned int *p_int = reinterpret_cast<const unsigned int*>(p_buf);
