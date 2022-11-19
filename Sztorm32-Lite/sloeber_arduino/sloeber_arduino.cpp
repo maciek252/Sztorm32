@@ -100,6 +100,8 @@ uint8_t yawSecondByte = 0;
 HardwareSerial gps_serial(2);
 uCRC16XModemLib crc;
 
+
+
 class GimbalState {
 public:
 	double yaw;
@@ -141,6 +143,21 @@ double feyiuAngleTo360(double angle) {
 void setYaw(double desiredAngle) {
 	desiredYaw = desiredAngle;
 	isMoving = true;
+}
+
+uint8_t * prepareMoveCommand(uint8_t * commandZero, int yaw, int pitch){
+
+	if(yaw > 0)
+		commandZero[4] = yaw;
+	else
+		commandZero[5] = yaw;
+
+	if(pitch > 0)
+		commandZero[6] = pitch;
+	else
+		commandZero[7] = pitch;
+	return commandZero;
+
 }
 
 int decodeTwoBytesInt(int8_t firstByte, int8_t secondByte) {
@@ -307,9 +324,11 @@ void loop() {
 			moveTime = millis();
 			isMoving = true;
 
-			desiredYaw = yaw360 + 40.0;
+			desiredYaw = yaw360 - 40.0;
 			if (desiredYaw > 360.0)
 				desiredYaw -= 360.0;
+			if (desiredYaw < 0)
+				desiredYaw = 360.0 + desiredYaw;
 
 			Serial.print(
 					"@@@@@@@@@@@@@@@@@@@@@!!DESIRED=");
@@ -322,7 +341,13 @@ void loop() {
 			//if (sendCounter < 400) {
 
 			if (abs(desiredYaw - yaw360) > 10) {
-				sendCommand(commandShort, 8);
+
+				uint8_t commandZero[] =
+						{ 0x00, 0x11, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
+				uint8_t * commandMove = prepareMoveCommand(commandZero, 0xff, 0x00);
+
+				//sendCommand(commandShort, 8);
+				sendCommand(commandMove, 8);
 				Serial.print(
 						"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
 			} else {
