@@ -70,6 +70,10 @@ const uint8_t commandShort[] =
 // 0xff,0x44 - powoli sie kreci
 // 500 ms - tez ruch ciagly, wyraznie wolniej
 
+const int cameraMovesVector[3][2] = { { 30, 0 }, { 5, 5 }, { 3, 5 } };
+
+int cameraMovesCounter = 0;
+
 //const uint8_t command[] = {0xA5, 0x5A, 0x00 , 0x11 , 0x05 , 0xff ,0x2d ,0x00, 0x00,0x00 ,0x7c ,0x98};
 const uint8_t commandStartTm[] = { 0x00, 0x10, 0x05, 0xff, 0x00, 0x00, 0x00,
 		0x00 };
@@ -79,8 +83,10 @@ const uint8_t commandHeader[] = { 0xA5, 0x5A };
 #define TXD2 17
 
 int sendCounter = 0;
-bool isMoving = false;
+bool isMovingYaw = false;
+bool isMovingPitch = false;
 double desiredYaw = 0;
+double desiredPitch = 0;
 
 long sendTime = 0;
 long moveTime = 0;
@@ -90,6 +96,7 @@ int receiveEffectiveCounter = 0;
 int receiveLength = 0;
 int messageFirstByte = 0;
 int messageSecondByte = 0;
+double yawDirection = 0;
 uint8_t pitchFirstByte = 0;
 uint8_t pitchSecondByte = 0;
 uint8_t rollFirstByte = 0;
@@ -99,8 +106,6 @@ uint8_t yawSecondByte = 0;
 
 HardwareSerial gps_serial(2);
 uCRC16XModemLib crc;
-
-
 
 class GimbalState {
 public:
@@ -142,17 +147,18 @@ double feyiuAngleTo360(double angle) {
 
 void setYaw(double desiredAngle) {
 	desiredYaw = desiredAngle;
-	isMoving = true;
+	isMovingYaw = true;
 }
 
-uint8_t * prepareMoveCommand(uint8_t * commandZero, int yaw, int pitch){
+uint8_t* prepareMoveCommand(uint8_t *commandZero, int yaw, int pitch) {
 
-	if(yaw > 0)
+	if (yaw > 0)
 		commandZero[4] = yaw;
 	else
-		commandZero[5] = yaw;
+		commandZero[5] = 0xff;
 
-	if(pitch > 0)
+	// this moves upwards
+	if (pitch > 0)
 		commandZero[6] = pitch;
 	else
 		commandZero[7] = pitch;
@@ -299,6 +305,26 @@ void sendCommand(const uint8_t *command, int length) {
 
 }
 
+double normalize360(double a) {
+	double result = a;
+	if (a > 360.0)
+		result -= 360.0;
+	if (a < 0)
+		result = 360.0 + result;
+	return result;
+}
+
+double getCwOrCcw(double desired, double current) {
+
+	double ccw = normalize360(desired - current);
+	double cw = normalize360(current - desired);
+
+	if (ccw > cw) {
+		return -cw;
+	}
+	return ccw;
+}
+
 // the loop function runs over and over again forever
 void loop() {
 
@@ -308,52 +334,70 @@ void loop() {
 	//bool wynik = true;
 	bool wynik = getGimbalState(g);
 	if (wynik) {
-		Serial.print("\nposi!\n");
-		Serial.print(g.pitch);
-		Serial.print(" ");
-		Serial.print(g.roll);
-		Serial.print(" ");
-		double yaw360 = feyiuAngleTo360(g.yaw);
-		Serial.print(yaw360);
-		Serial.print(" des=");
-		Serial.print(desiredYaw);
 
 		Serial.print("\n");
+		double yaw360 = feyiuAngleTo360(g.yaw);
 
-		if (!isMoving && (millis() - moveTime > 5000)) {
+		if (!isMovingYaw && (millis() - moveTime > 5000)) {
 			moveTime = millis();
-			isMoving = true;
+			isMovingYaw = true;
 
-			desiredYaw = yaw360 - 40.0;
-			if (desiredYaw > 360.0)
-				desiredYaw -= 360.0;
-			if (desiredYaw < 0)
-				desiredYaw = 360.0 + desiredYaw;
+			desiredYaw = normalize360(yaw360 + 40.0);
+			//desiredYaw = yaw360 + getCwOrCcw(desiredYaw, yaw360);
+			//desiredYaw = yaw360 - 40.0;
+			yawDirection = getCwOrCcw(desiredYaw, yaw360);
 
-			Serial.print(
-					"@@@@@@@@@@@@@@@@@@@@@!!DESIRED=");
+			//desiredYaw = normalize360(desiredYaw);
+
+			Serial.print("\nposi!\n");
+			Serial.print(g.pitch);
+			Serial.print(" ");
+			Serial.print(g.roll);
+			Serial.print(" ");
+
+			Serial.print(yaw360);
+			Serial.print(" des=");
 			Serial.print(desiredYaw);
+
+			Serial.print("@@@@@@@@@@@@@@@@@@@@@!!DESIRED=");
+			Serial.print(desiredYaw);
+			Serial.print("@@@@@@@@@@@@@@@@@@@@@!!YAW_DIRECTION=");
+			Serial.print(yawDirection);
 			Serial.print("!\n");
 		}
 
-		if (isMoving && (millis() - sendTime > 500)) {
+		if (isMovingYaw && (millis() - sendTime > 500)) {
 			sendTime = millis();
 			//if (sendCounter < 400) {
 
 			if (abs(desiredYaw - yaw360) > 10) {
 
-				uint8_t commandZero[] =
-						{ 0x00, 0x11, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
-				uint8_t * commandMove = prepareMoveCommand(commandZero, 0xff, 0x00);
+				uint8_t commandZero[] = { 0x00, 0x11, 0x05, 0xff, 0x00, 0x00,
+						0x00, 0x00 };
+
+				int value = 256;
+				if(yawDirection > 0){
+					value = -256;
+				}
+
+				uint8_t *commandMove = prepareMoveCommand(commandZero, value,
+						0xff);
 
 				//sendCommand(commandShort, 8);
 				sendCommand(commandMove, 8);
+
+				Serial.print(" yaw360=");
+
+				Serial.print(yaw360);
+				Serial.print(" des=");
+				Serial.print(desiredYaw);
+
 				Serial.print(
 						"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
 			} else {
 				Serial.print(
 						"=========================== TARGET!!==========================!\n");
-				isMoving = false;
+				isMovingYaw = false;
 				moveTime = millis();
 			}
 
