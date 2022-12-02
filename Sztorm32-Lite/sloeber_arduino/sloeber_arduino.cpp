@@ -81,11 +81,17 @@ const uint8_t commandStartTm[] = { 0x00, 0x10, 0x05, 0xff, 0x00, 0x00, 0x00,
 const uint8_t commandHeader[] = { 0xA5, 0x5A };
 #define RXD2 16
 #define TXD2 17
+const int YAW_IDX = 0;
+const int ROLL_IDX = 1;
+const int PITCH_IDX = 2;
 
 int sendCounter = 0;
 bool isMovingYaw = false;
 bool isMovingPitch = false;
 double desiredYaw = 0;
+double desired[3];
+bool isMoving[3] = { false, false, false };
+double pos360[3];
 double desiredPitch = 0;
 
 long sendTime = 0;
@@ -115,6 +121,28 @@ public:
 
 };
 
+void sendCommand(const uint8_t *command, int length) {
+
+	//Serial.println(sizeof(command));
+	//Serial.println(command[1], HEX);
+	crc2.clearCrc();
+	for (int j = 0; j < length; j++) {
+		crc2.updateCrc(command[j]);
+	}
+	unsigned short value = crc2.getCrc();
+	//Serial.print("crc = 0x");
+	//Serial.println(value, HEX);
+
+	gps_serial.write((uint8_t*) commandHeader, sizeof(commandHeader));
+	gps_serial.write((uint8_t*) command, length);
+	byte *b;
+	b = (byte*) &value;
+	gps_serial.write(b[0]);
+	gps_serial.write(b[1]);
+
+}
+
+
 // the setup function runs once when you press reset or power the board
 void setup() {
 	// initialize digital pin LED_BUILTIN as an output.
@@ -136,6 +164,8 @@ void setup() {
 	Serial.begin(115200);
 
 	sendCounter = 0;
+
+	delay(900);
 }
 
 double feyiuAngleTo360(double angle) {
@@ -161,7 +191,7 @@ uint8_t* prepareMoveCommand(uint8_t *commandZero, int yaw, int pitch) {
 	if (pitch > 0)
 		commandZero[6] = pitch;
 	else
-		commandZero[7] = pitch;
+		commandZero[7] = 0xff;
 	return commandZero;
 
 }
@@ -252,22 +282,6 @@ bool getGimbalState(GimbalState &g) {
 								rollSecondByte);
 						int posYaw = decodeTwoBytesInt(yawFirstByte,
 								yawSecondByte);
-//						Serial.print("pozycja!\n");
-//						Serial.print(pozPitch);
-//						Serial.print(" ");
-//						Serial.print(pozRoll);
-//						Serial.print(" ");
-//						Serial.print(pozYaw);
-//						Serial.print(" ");
-//						Serial.print(yawFirstByte);
-//						Serial.print(" ");
-//						Serial.print(yawSecondByte);
-//						Serial.print("\npos!\n");
-//						Serial.print(posPitch);
-//						Serial.print(" ");
-//						Serial.print(posRoll);
-//						Serial.print(" ");
-//						Serial.print(posYaw);
 
 						g.yaw = ((double) posYaw) / 100.0;
 						g.roll = ((double) posRoll) / 100.0;
@@ -284,26 +298,6 @@ bool getGimbalState(GimbalState &g) {
 	return false;
 }
 
-void sendCommand(const uint8_t *command, int length) {
-
-	//Serial.println(sizeof(command));
-	//Serial.println(command[1], HEX);
-	crc2.clearCrc();
-	for (int j = 0; j < length; j++) {
-		crc2.updateCrc(command[j]);
-	}
-	unsigned short value = crc2.getCrc();
-	//Serial.print("crc = 0x");
-	//Serial.println(value, HEX);
-
-	gps_serial.write((uint8_t*) commandHeader, sizeof(commandHeader));
-	gps_serial.write((uint8_t*) command, length);
-	byte *b;
-	b = (byte*) &value;
-	gps_serial.write(b[0]);
-	gps_serial.write(b[1]);
-
-}
 
 double normalize360(double a) {
 	double result = a;
@@ -325,87 +319,147 @@ double getCwOrCcw(double desired, double current) {
 	return ccw;
 }
 
+void doMovingPitchAndYaw() {
+
+	int yawMove = 0;
+	int pitchMove = 0;
+
+	if (isMoving[YAW_IDX]) {
+		if (abs(desired[YAW_IDX] - pos360[YAW_IDX]) > 10) {
+
+			int yawMove = 256;
+			yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX]);
+			if (yawDirection > 0) {
+				yawMove = -256;
+			}
+		} else {
+			Serial.print(
+					"===========================REACHED YAW TARGET!!==========================!\n");
+			isMoving[YAW_IDX] = false;
+			moveTime = millis();
+
+		}
+	}
+	if (isMoving[PITCH_IDX]) {
+		if (abs(desired[PITCH_IDX] - pos360[PITCH_IDX]) > 10) {
+
+			int pitchMove = 256;
+			int pitchDirection = getCwOrCcw(desired[PITCH_IDX],
+					pos360[PITCH_IDX]);
+			if (pitchDirection > 0) {
+				pitchMove = -256;
+			}
+		} else {
+			Serial.print(
+					"===========================REACHED PITCH TARGET!!==========================!\n");
+			isMoving[PITCH_IDX] = false;
+			moveTime = millis();
+		}
+	}
+
+	if (yawMove != 0 || pitchMove != 0) {
+
+		//if (sendCounter < 400) {
+
+		uint8_t commandZero[] =
+				{ 0x00, 0x11, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
+
+
+		uint8_t *commandMove = prepareMoveCommand(commandZero, yawMove, pitchMove);
+
+		//sendCommand(commandShort, 8);
+		sendCommand(commandMove, 8);
+
+		Serial.print(" yaw360=");
+
+		Serial.print(pos360[YAW_IDX]);
+		Serial.print(" des=");
+		Serial.print(desiredYaw);
+
+		Serial.print(
+				"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
+
+	}
+	//sendCounter++;
+}
+
+
+
+void doMovingRoll() {
+
+}
+
+void doMoving() {
+
+doMovingPitchAndYaw();
+doMovingRoll();
+
+}
+
 // the loop function runs over and over again forever
 void loop() {
 
-	byte bajty[30];
+byte bajty[30];
 
-	GimbalState g;
-	//bool wynik = true;
-	bool wynik = getGimbalState(g);
-	if (wynik) {
+if (sendCounter < 50) {
+	sendCommand(commandStartTm, 8);
+	sendCounter++;
+	delay(100);
+	Serial.print("@@@@@@@@@@@@@@@@@@@@@!!START TM=\n");
+} else{
+//	sendCounter = 0;
+}
 
-		Serial.print("\n");
-		double yaw360 = feyiuAngleTo360(g.yaw);
 
-		if (!isMovingYaw && (millis() - moveTime > 5000)) {
-			moveTime = millis();
-			isMovingYaw = true;
+GimbalState g;
+//bool wynik = true;
+bool wynik = getGimbalState(g);
+//delay(100);
+if(false){
+//if (wynik) {
 
-			desiredYaw = normalize360(yaw360 + 40.0);
-			//desiredYaw = yaw360 + getCwOrCcw(desiredYaw, yaw360);
-			//desiredYaw = yaw360 - 40.0;
-			yawDirection = getCwOrCcw(desiredYaw, yaw360);
+	Serial.print("\n");
+	//double yaw360 = feyiuAngleTo360(g.yaw);
+	pos360[YAW_IDX] = feyiuAngleTo360(g.yaw);
+	pos360[ROLL_IDX] = feyiuAngleTo360(g.roll);
+	pos360[PITCH_IDX] = feyiuAngleTo360(g.pitch);
 
-			//desiredYaw = normalize360(desiredYaw);
+	// not moving - so set the target and get going
+	if (!isMovingYaw && (millis() - moveTime > 5000)) {
+		moveTime = millis();
+		isMovingYaw = true;
 
-			Serial.print("\nposi!\n");
-			Serial.print(g.pitch);
-			Serial.print(" ");
-			Serial.print(g.roll);
-			Serial.print(" ");
+		desiredYaw = normalize360(pos360[YAW_IDX] + 40.0);
+		//desiredYaw = yaw360 + getCwOrCcw(desiredYaw, yaw360);
+		//desiredYaw = yaw360 - 40.0;
 
-			Serial.print(yaw360);
-			Serial.print(" des=");
-			Serial.print(desiredYaw);
+		//desiredYaw = normalize360(desiredYaw);
 
-			Serial.print("@@@@@@@@@@@@@@@@@@@@@!!DESIRED=");
-			Serial.print(desiredYaw);
-			Serial.print("@@@@@@@@@@@@@@@@@@@@@!!YAW_DIRECTION=");
-			Serial.print(yawDirection);
-			Serial.print("!\n");
-		}
+		Serial.print("\nposi!\n");
+		Serial.print(g.pitch);
+		Serial.print(" ");
+		Serial.print(g.roll);
+		Serial.print(" ");
 
-		if (isMovingYaw && (millis() - sendTime > 500)) {
-			sendTime = millis();
-			//if (sendCounter < 400) {
+		Serial.print(pos360[YAW_IDX]);
+		Serial.print(" des=");
+		Serial.print(desiredYaw);
 
-			if (abs(desiredYaw - yaw360) > 10) {
+		Serial.print("@@@@@@@@@@@@@@@@@@@@@!!DESIRED=");
+		Serial.print(desiredYaw);
+		Serial.print("@@@@@@@@@@@@@@@@@@@@@!!YAW_DIRECTION=");
+		Serial.print(yawDirection);
+		Serial.print("!\n");
+	}
 
-				uint8_t commandZero[] = { 0x00, 0x11, 0x05, 0xff, 0x00, 0x00,
-						0x00, 0x00 };
+	if ((millis() - sendTime > 500)) {
+		sendTime = millis();
 
-				int value = 256;
-				if(yawDirection > 0){
-					value = -256;
-				}
-
-				uint8_t *commandMove = prepareMoveCommand(commandZero, value,
-						0xff);
-
-				//sendCommand(commandShort, 8);
-				sendCommand(commandMove, 8);
-
-				Serial.print(" yaw360=");
-
-				Serial.print(yaw360);
-				Serial.print(" des=");
-				Serial.print(desiredYaw);
-
-				Serial.print(
-						"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
-			} else {
-				Serial.print(
-						"=========================== TARGET!!==========================!\n");
-				isMovingYaw = false;
-				moveTime = millis();
-			}
-
-			//sendCounter++;
-
-		}
+		//doMoving();
 
 	}
+
+}
 
 //	digitalWrite(LED_BUILTIN, HIGH); // turn the LED on (HIGH is the voltage level)
 //	digitalWrite(LED_BUILTIN2, HIGH); // turn the LED on (HIGH is the voltage level)
@@ -414,13 +468,8 @@ void loop() {
 //	digitalWrite(LED_BUILTIN2, LOW); // turn the LED off by making the voltage LOW
 //	delay(1000);                       // wait for a second
 
-	if (sendCounter < 40) {
-		sendCommand(commandStartTm, 8);
-		sendCounter++;
-	} else
-		sendCounter = 0;
 
-	const char *p_buf = "abcd";
-	const unsigned int *p_int = reinterpret_cast<const unsigned int*>(p_buf);
+const char *p_buf = "abcd";
+const unsigned int *p_int = reinterpret_cast<const unsigned int*>(p_buf);
 }
 
