@@ -70,7 +70,11 @@ const uint8_t commandShort[] =
 // 0xff,0x44 - powoli sie kreci
 // 500 ms - tez ruch ciagly, wyraznie wolniej
 
-const int cameraMovesVector[3][2] = { { 30, 0 }, { 5, 5 }, { 3, 5 } };
+// YAW, ROLL, PITCH
+const int cameraMovesVector[6][3] = { { 0, 0, -50 }, { -30, 0, 50 }, { 30, 0,
+		-50 }, { 0, 0, 50 } };
+const int numOfSteps = 4;
+int currentStep = -1;
 
 int cameraMovesCounter = 0;
 
@@ -87,12 +91,12 @@ const int PITCH_IDX = 2;
 
 int sendCounter = 0;
 
-
+int pitchDirection;
+int yawDirection;
 
 double desired[3];
 bool isMoving[3] = { false, false, false };
 double pos360[3];
-
 
 long sendTime = 0;
 long moveTime = 0;
@@ -175,18 +179,17 @@ double feyiuAngleTo360(double angle) {
 	return 360 + angle;
 }
 
-
 uint8_t* prepareMoveCommand(uint8_t *commandZero, int yaw, int pitch) {
 
 	if (yaw > 0)
 		commandZero[4] = 0xff;
-	else if(yaw < 0)
+	else if (yaw < 0)
 		commandZero[5] = 0xff;
 
 	// this moves upwards
 	if (pitch > 0)
 		commandZero[6] = 0xff;
-	else if(pitch < 0)
+	else if (pitch < 0)
 		commandZero[7] = 0xff;
 	return commandZero;
 
@@ -303,15 +306,86 @@ double normalize360(double a) {
 	return result;
 }
 
-double getCwOrCcw(double desired, double current) {
+double getCwOrCcw(double desired, double current, int variant) {
 
 	double ccw = normalize360(desired - current);
 	double cw = normalize360(current - desired);
 
-	if (ccw > cw) {
+	Serial.print("ccw=");
+	Serial.print(ccw);
+	Serial.print("cw=");
+	Serial.print(cw);
+	Serial.print("\n");
+
+	if (variant == PITCH_IDX) {
+		if (cw < ccw) {
+			return ccw;
+		}
 		return -cw;
 	}
-	return ccw;
+
+	if (cw > ccw) {
+		return ccw;
+	}
+	return -cw;
+}
+
+
+void recenterGimbal() {
+
+	// works!
+	//02 40 02 05 02
+	uint8_t commandRecenter[] = { 0x02, 0x40, 0x02, 0x05, 0x02 };
+
+	//sendCommand(commandShort, 8);
+	sendCommand(commandRecenter, 5);
+}
+
+void resetGimbal() {
+	//02 0F 00
+	uint8_t commandReset[] = { 0x02, 0x0f, 0x00 };
+
+	//sendCommand(commandShort, 8);
+	sendCommand(commandReset, 3);
+}
+
+void setRoll() {
+	//02 0D 03 16 BC 02
+	// dziala! 2003 - w lewo delikatnie
+	// bc02 - nic 9001 - b. delikatnie w prawo!
+	// A001- nic
+	// 845c - mocno w prawo i wariuje!
+	//841c - tez wariuje
+	// druga wazna i ma byc malo!
+	// 8403 - nic zauwazalnego
+// 2003 0 mocniej w lewo
+// 2c03 - nic
+	// 2c01 - prawie plasko
+	// 2f01 - nic
+	// 2004
+	// 2005 - mocniej niz 2003? -
+	// 2007 - zdecydowanie mocniej niz 2003!! koniec polki prawie cm!
+	// 20fe - malo ale w prawo
+// 20fa - mocno w prawo!
+
+	uint8_t commandRoll[] = { 0x02, 0x0d, 0x03, 0x16, 0x20, 0xfa };
+	//commandRoll[3] = 0x16; // to chyba indeks tej operacji
+	//commandRoll[4] = 0x20;
+	//commandRoll[5] = 0x03;
+
+
+
+	// 9020 tez nic, nie wiem czy poprzednie dobre? 0302 nie dziala!
+	// zle indeksy byly, jeszcze raZ!
+	// 0302 w zasadzie nic moze trzeba save?
+	//sendCommand(commandShort, 8);
+	Serial.print("SETTING ROLL=\n");
+	sendCommand(commandRoll, 6);
+
+
+	// this is starttm
+	//uint8_t commandSave[] = { 0x00, 0x10, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
+	//sendCommand(commandSave, 8);
 }
 
 void doMovingPitchAndYaw() {
@@ -322,13 +396,13 @@ void doMovingPitchAndYaw() {
 	if (isMoving[YAW_IDX]) {
 		if (abs(desired[YAW_IDX] - pos360[YAW_IDX]) > 10) {
 
-			Serial.print("===========================YAW MOVE!!==========================!\n");
+			Serial.print(
+					"===========================YAW MOVE!!==========================!\n");
 			yawMove = 256;
-			int yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX]);
+			//int yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX]);
 			if (yawDirection > 0) {
 				yawMove = -256;
 			}
-
 
 		} else {
 			Serial.print(
@@ -338,22 +412,22 @@ void doMovingPitchAndYaw() {
 
 		}
 	}
-//	if (isMoving[PITCH_IDX]) {
-//		if (abs(desired[PITCH_IDX] - pos360[PITCH_IDX]) > 10) {
-//
-//			int pitchMove = 256;
+	if (isMoving[PITCH_IDX]) {
+		if (abs(desired[PITCH_IDX] - pos360[PITCH_IDX]) > 10) {
+
+			pitchMove = 256;
 //			int pitchDirection = getCwOrCcw(desired[PITCH_IDX],
 //					pos360[PITCH_IDX]);
-//			if (pitchDirection > 0) {
-//				pitchMove = -256;
-//			}
-//		} else {
-//			Serial.print(
-//					"===========================REACHED PITCH TARGET!!==========================!\n");
-//			isMoving[PITCH_IDX] = false;
-//			moveTime = millis();
-//		}
-//	}
+			if (pitchDirection > 0) {
+				pitchMove = -256;
+			}
+		} else {
+			Serial.print(
+					"===========================REACHED PITCH TARGET!!==========================!\n");
+			isMoving[PITCH_IDX] = false;
+			moveTime = millis();
+		}
+	}
 
 	if (yawMove != 0 || pitchMove != 0) {
 
@@ -367,8 +441,12 @@ void doMovingPitchAndYaw() {
 
 		//sendCommand(commandShort, 8);
 		sendCommand(commandMove, 8);
-		Serial.print(
-				"-------------------------------------------------------SEND-COMMAND-----------------------!\n");
+		Serial.print("-----SEND SEND-COMMAND-----------------------!");
+		Serial.print("yawMove=");
+		Serial.print(yawMove);
+		Serial.print("pitchMove=");
+		Serial.print(pitchMove);
+		Serial.print("\n");
 
 	}
 	//sendCounter++;
@@ -378,7 +456,7 @@ void doMovingRoll() {
 
 }
 
-void printReport(){
+void printReport() {
 	Serial.print("CURRENT 360 Y=");
 	Serial.print(pos360[YAW_IDX]);
 	Serial.print(" R=");
@@ -397,9 +475,10 @@ void printReport(){
 	Serial.print(isMoving[ROLL_IDX]);
 	Serial.print(" P=");
 	Serial.print(isMoving[PITCH_IDX]);
+	Serial.print("currStep=");
+	Serial.print(currentStep);
 	Serial.print("\n");
 }
-
 
 void doMoving() {
 
@@ -425,38 +504,57 @@ void loop() {
 	GimbalState g;
 
 	bool wynik = getGimbalState(g);
+
+
+	//recenterGimbal();
+	//resetGimbal();
+	setRoll();
+	delay(1000);
+	return;
+
 //delay(100);
 	if (wynik) {
-//if (wynik) {
 
-		Serial.print("\n");
-		//double yaw360 = feyiuAngleTo360(g.yaw);
 		pos360[YAW_IDX] = feyiuAngleTo360(g.yaw);
 		pos360[ROLL_IDX] = feyiuAngleTo360(g.roll);
 		pos360[PITCH_IDX] = feyiuAngleTo360(g.pitch);
 
 		// not moving - so set the target and get going
-		if (!isMoving[YAW_IDX] && (millis() - moveTime > 5000)) {
+		if (!isMoving[YAW_IDX] && !isMoving[PITCH_IDX]
+				&& (millis() - moveTime > 5000)) {
 
-			Serial.print("\npos pitch!\n");
-			Serial.print(g.pitch);
-			Serial.print(" roll:");
-			Serial.print(g.roll);
-			Serial.print(" ");
+
 
 			moveTime = millis();
 			isMoving[YAW_IDX] = true;
+			isMoving[PITCH_IDX] = true;
 
-			desired[YAW_IDX] = normalize360(pos360[YAW_IDX] + 40.0);
+			currentStep++;
+			if (currentStep == numOfSteps) {
+				currentStep = 0;
+			}
+			desired[YAW_IDX] = normalize360(
+					pos360[YAW_IDX] + cameraMovesVector[currentStep][YAW_IDX]);
+			desired[PITCH_IDX] = normalize360(
+					pos360[PITCH_IDX]
+							+ cameraMovesVector[currentStep][PITCH_IDX]);
+
+			pitchDirection = getCwOrCcw(desired[PITCH_IDX], pos360[PITCH_IDX],
+					PITCH_IDX);
+
+			yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX],
+					YAW_IDX);
+
+			Serial.print(
+					"SETTING TARGETS!!!========================================");
 
 			printReport();
-
 
 		}
 
 		if ((millis() - sendTime > 500)) {
 			sendTime = millis();
-			Serial.print("DO MOVING=");
+			Serial.print("DO MOVING==================================");
 
 			doMoving();
 			printReport();
