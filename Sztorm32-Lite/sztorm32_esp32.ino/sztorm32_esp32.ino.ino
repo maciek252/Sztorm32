@@ -59,8 +59,8 @@ int receiveEffectiveCounter = 0;
 int receiveLength = 0;
 int messageFirstByte = 0;
 int messageSecondByte = 0;
-uint8_t yawFirstByte = 0;
-uint8_t yawSecondByte = 0;
+uint8_t pitchFirstByte = 0;
+uint8_t pitchSecondByte = 0;
 HardwareSerial gps_serial(2);
 uCRC16XModemLib crc;
 
@@ -125,9 +125,9 @@ if(gps_serial.available()) {
         }
 
         if(receiveCounter == 6)
-          yawSecondByte = (uint8_t) serIn;
+          pitchSecondByte = (uint8_t) serIn;
         if(receiveCounter == 7)
-          yawFirstByte = (uint8_t) serIn;
+          pitchFirstByte = (uint8_t) serIn;
 
         if(receiveLength > 0){
           receiveLength--;
@@ -138,7 +138,7 @@ if(gps_serial.available()) {
             if(messageFirstByte == 0x03 && messageSecondByte == 0x10){
               //int poz = yawFirstByte << 8 + yawSecondByte;                                    
               //int poz = yawFirstByte << 8 ;
-              int poz = (int)((int8_t)yawFirstByte); // this should sign extend the number
+              int poz = (int)((int8_t)pitchFirstByte); // this should sign extend the number
               poz <<= 8;
               Serial.print("pozycja!\n");
               Serial.print( poz );
