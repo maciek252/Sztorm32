@@ -71,8 +71,10 @@ const uint8_t commandShort[] =
 // 500 ms - tez ruch ciagly, wyraznie wolniej
 
 // YAW, ROLL, PITCH
-const int cameraMovesVector[6][3] = { { 0, 0, -50 }, { -30, 0, 50 }, { 30, 0,
-		-50 }, { 0, 0, 50 } };
+const int cameraMovesVector[6][3] = { { 0, 4, 0 }, { 0, -4, 0 }, { 0,
+		5, 0 }, { 0, 0, 0 } };
+//const int cameraMovesVector[6][3] = { { 0, 10, -50 }, { -30, -10, 50 }, { 30,
+	//	10, -50 }, { 0, 0, 50 } };
 const int numOfSteps = 4;
 int currentStep = -1;
 
@@ -90,9 +92,10 @@ const int ROLL_IDX = 1;
 const int PITCH_IDX = 2;
 
 int sendCounter = 0;
-
+bool tempRoll = false;
 int pitchDirection;
 int yawDirection;
+int rollDirection;
 
 double desired[3];
 bool isMoving[3] = { false, false, false };
@@ -155,7 +158,7 @@ void setup() {
 	digitalWrite(32, HIGH);   // turn the LED on (HIGH is the voltage level)
 
 	//pinMode(14, OUTPUT);
-	//digitalWrite(14, HIGH);   // turn the LED on (HIGH is the voltage level)
+	//digitalWrite(14 HIGH);   // turn the LED on (HIGH is the voltage level)
 
 	pinMode(LED_BUILTIN, OUTPUT);
 	pinMode(LED_BUILTIN2, OUTPUT);
@@ -330,7 +333,6 @@ double getCwOrCcw(double desired, double current, int variant) {
 	return -cw;
 }
 
-
 void recenterGimbal() {
 
 	// works!
@@ -365,15 +367,27 @@ void setRoll() {
 	// 2004
 	// 2005 - mocniej niz 2003? -
 	// 2007 - zdecydowanie mocniej niz 2003!! koniec polki prawie cm!
-	// 20fe - malo ale w prawo
+	// 20fe - malo ale w prawo //z grubsza plasko
+	// 20ee tez mocno w prawo
 // 20fa - mocno w prawo!
 
-	uint8_t commandRoll[] = { 0x02, 0x0d, 0x03, 0x16, 0x20, 0xfa };
+	// 20xx
+	// fa, ee - mocno w prawo i prawie plasko
+	// 03, fa - pol-lewo i malo prawo
+	// 03, ee- pol-lewo(03) i bardz o mocno w prawo (ee)
+	// 07, ee -mocno w obie strony, ee mocniej
+
+	uint8_t commandRoll[] = { 0x02, 0x0d, 0x03, 0x16, 0x22, 0x0d };
+	if(tempRoll){
+		commandRoll[5] = 0xee;
+	}
+	// ee to minusy? ff to zero, i potem w dol
+
+	tempRoll = !tempRoll;
+
 	//commandRoll[3] = 0x16; // to chyba indeks tej operacji
 	//commandRoll[4] = 0x20;
 	//commandRoll[5] = 0x03;
-
-
 
 	// 9020 tez nic, nie wiem czy poprzednie dobre? 0302 nie dziala!
 	// zle indeksy byly, jeszcze raZ!
@@ -381,7 +395,6 @@ void setRoll() {
 	//sendCommand(commandShort, 8);
 	Serial.print("SETTING ROLL=\n");
 	sendCommand(commandRoll, 6);
-
 
 	// this is starttm
 	//uint8_t commandSave[] = { 0x00, 0x10, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
@@ -454,6 +467,44 @@ void doMovingPitchAndYaw() {
 
 void doMovingRoll() {
 
+	int yawMove = 0;
+	int rollMove = 0;
+
+	if (isMoving[ROLL_IDX]) {
+		if (abs(desired[ROLL_IDX] - pos360[ROLL_IDX]) > 10) {
+
+			rollMove = 256;
+//			int pitchDirection = getCwOrCcw(desired[PITCH_IDX],
+//					pos360[PITCH_IDX]);
+			if (rollDirection > 0) {
+				rollMove = -256;
+			}
+		} else {
+			Serial.print(
+					"===========================REACHED ROLL TARGET!!==========================!\n");
+			isMoving[ROLL_IDX] = false;
+			moveTime = millis();
+		}
+	}
+
+	if (rollMove != 0 ) {
+
+
+		uint8_t commandZero[] =
+				{ 0x00, 0x11, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
+
+//		uint8_t *commandMove = prepareMoveCommand(commandZero, yawMove,
+//				pitchMove);
+//
+//		sendCommand(commandMove, 8);
+		Serial.print("-----SEND SEND-COMMAND-----------------------!");
+		Serial.print("rollMove=");
+		Serial.print(rollMove);
+		Serial.print("\n");
+
+	}
+
+
 }
 
 void printReport() {
@@ -505,7 +556,6 @@ void loop() {
 
 	bool wynik = getGimbalState(g);
 
-
 	//recenterGimbal();
 	//resetGimbal();
 	setRoll();
@@ -523,8 +573,6 @@ void loop() {
 		if (!isMoving[YAW_IDX] && !isMoving[PITCH_IDX]
 				&& (millis() - moveTime > 5000)) {
 
-
-
 			moveTime = millis();
 			isMoving[YAW_IDX] = true;
 			isMoving[PITCH_IDX] = true;
@@ -533,6 +581,17 @@ void loop() {
 			if (currentStep == numOfSteps) {
 				currentStep = 0;
 			}
+
+			if (cameraMovesVector[currentStep][YAW_IDX] == -1
+					&& cameraMovesVector[currentStep][ROLL_IDX] == -1
+					&& cameraMovesVector[currentStep][PITCH_IDX] == -1) {
+				recenterGimbal();
+				delay(4000);
+				return;
+			}
+
+			desired[ROLL_IDX] = cameraMovesVector[currentStep][ROLL_IDX];
+
 			desired[YAW_IDX] = normalize360(
 					pos360[YAW_IDX] + cameraMovesVector[currentStep][YAW_IDX]);
 			desired[PITCH_IDX] = normalize360(
@@ -544,6 +603,9 @@ void loop() {
 
 			yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX],
 					YAW_IDX);
+
+			rollDirection = getCwOrCcw(desired[ROLL_IDX], pos360[ROLL_IDX],
+								ROLL_IDX);
 
 			Serial.print(
 					"SETTING TARGETS!!!========================================");
