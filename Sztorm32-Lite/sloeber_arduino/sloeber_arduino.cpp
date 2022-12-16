@@ -24,21 +24,29 @@
 #include "uCRC16XModemLib.h"
 
 #include "Crc16.h"
+
+namespace {
+
+const int TIME_BETWEEN_STEPS = 5000;
+const int TIME_BETWEEN_MOVES = 500;
+
+}
+
 //Crc 16 library (XModem)
 Crc16 crc2;
 
 // diody dzialaja bez power on!
 // 19 - power on! // chyba nie...
 // 27 - RED LED FRONT
-// 32 led blue
+// 32 led blue CONFIRMED!
 // 12 tez led blue?
 // 14 - no led?
 // 23  - zielona z boku!
 // 34, 35 - no led
 // 21 lub 32 - blue z przodu, mruga!
 // 33 lub 25 - czerwona z boku!
-#define LED_BUILTIN 33
-#define LED_BUILTIN2 25
+#define LED_BUILTIN 27
+#define LED_BUILTIN2 14
 
 //orientacja:
 // yaw: USBSIDE: 0/-0
@@ -70,12 +78,16 @@ const uint8_t commandShort[] =
 // 0xff,0x44 - powoli sie kreci
 // 500 ms - tez ruch ciagly, wyraznie wolniej
 
+// certain, proved: -2 almost flat, -9, 9 - boundaries
+
 // YAW, ROLL, PITCH
-const int cameraMovesVector[6][3] = { { 0, 4, 0 }, { 0, -4, 0 }, { 0,
-		5, 0 }, { 0, 0, 0 } };
+const int cameraMovesVector[6][3] = { { 40, 9, 59 }, { 39, -9, 130 }, { 0, -2, 0 }, {
+		0, -7, 0 }, { 0, 0, 0 } };
+//const int cameraMovesVector[6][3] = { { 0, 9, 0 }, { 0, -9, 0 }, { 0, -2, 0 }, {
+//		0, -7, 0 }, { 0, 0, 0 } };
 //const int cameraMovesVector[6][3] = { { 0, 10, -50 }, { -30, -10, 50 }, { 30,
-	//	10, -50 }, { 0, 0, 50 } };
-const int numOfSteps = 4;
+//	10, -50 }, { 0, 0, 50 } };
+const int numOfSteps = 3;
 int currentStep = -1;
 
 int cameraMovesCounter = 0;
@@ -149,6 +161,20 @@ void sendCommand(const uint8_t *command, int length) {
 
 }
 
+void switchFrontLED(bool on) {
+
+
+	if (on) {
+
+		//32 - blue confirmed
+		digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+		digitalWrite(LED_BUILTIN2, LOW);   // turn the LED on (HIGH is the voltage level)
+	} else {
+		digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
+		digitalWrite(LED_BUILTIN2, HIGH);   // turn the LED on (HIGH is the voltage level)
+	}
+}
+
 // the setup function runs once when you press reset or power the board
 void setup() {
 
@@ -156,6 +182,7 @@ void setup() {
 	gps_serial.begin(115200, SERIAL_8N1, RXD2, TXD2);
 	pinMode(32, OUTPUT);
 	digitalWrite(32, HIGH);   // turn the LED on (HIGH is the voltage level)
+
 
 	//pinMode(14, OUTPUT);
 	//digitalWrite(14 HIGH);   // turn the LED on (HIGH is the voltage level)
@@ -171,6 +198,27 @@ void setup() {
 	Serial.begin(115200);
 
 	sendCounter = 0;
+
+//	while (true) {
+//		// 19 or so - power off?
+//		// 23 green small?
+//		// 27 red front
+//		// 7, 8 - crash!
+//		// 14 green front?
+//			for (int i = 9; i < 30; i++) {
+//				if(i == 7)
+//					continue;
+//				if(i == 8)
+//					continue;
+//				pinMode(i, OUTPUT);
+//				Serial.print(i);
+//				digitalWrite(i, HIGH); // turn the LED on (HIGH is the voltage level)
+//				delay(1000);
+//				digitalWrite(i, LOW); // turn the LED on (HIGH is the voltage level)
+//				delay(1000);
+//			}
+//		}
+
 
 	delay(900);
 }
@@ -351,7 +399,31 @@ void resetGimbal() {
 	sendCommand(commandReset, 3);
 }
 
-void setRoll() {
+void printReport() {
+	Serial.print("CURRENT 360 Y=");
+	Serial.print(pos360[YAW_IDX]);
+	Serial.print(" R=");
+	Serial.print(pos360[ROLL_IDX]);
+	Serial.print(" P=");
+	Serial.print(pos360[PITCH_IDX]);
+	Serial.print("  DESIRED Y=");
+	Serial.print(desired[YAW_IDX]);
+	Serial.print(" R=");
+	Serial.print(desired[ROLL_IDX]);
+	Serial.print(" P=");
+	Serial.print(desired[PITCH_IDX]);
+	Serial.print("  IS_MOVING Y=");
+	Serial.print(isMoving[YAW_IDX]);
+	Serial.print(" R=");
+	Serial.print(isMoving[ROLL_IDX]);
+	Serial.print(" P=");
+	Serial.print(isMoving[PITCH_IDX]);
+	Serial.print("currStep=");
+	Serial.print(currentStep);
+	Serial.print("\n");
+}
+
+void setRoll(int value) {
 	//02 0D 03 16 BC 02
 	// dziala! 2003 - w lewo delikatnie
 	// bc02 - nic 9001 - b. delikatnie w prawo!
@@ -377,11 +449,27 @@ void setRoll() {
 	// 03, ee- pol-lewo(03) i bardz o mocno w prawo (ee)
 	// 07, ee -mocno w obie strony, ee mocniej
 
-	uint8_t commandRoll[] = { 0x02, 0x0d, 0x03, 0x16, 0x22, 0x0d };
-	if(tempRoll){
-		commandRoll[5] = 0xee;
+	if (value > 16 || value < -16) {
+		return;
 	}
+
+	uint8_t commandRoll[] = { 0x02, 0x0d, 0x03, 0x16, 0x22, 0x0d };
+	if (value > 0)
+		commandRoll[5] = (char) value;
+	else if (value < 0)
+		commandRoll[5] = (char) (256 + value);
+
+	// fd - praktycznie plasko
+	// fa - lekko w prawo
+	// ed - max w prawo
+	// 08 prawie max w lewo
+	// 09 jeszcze mocniej w lewo
+
+//	if(tempRoll){
+//		commandRoll[5] = 0xee;
+//	}
 	// ee to minusy? ff to zero, i potem w dol
+	// 22xx, 0d, ee - glebokie, 22 nic nie zmienia, chyba less significant byte?
 
 	tempRoll = !tempRoll;
 
@@ -393,9 +481,11 @@ void setRoll() {
 	// zle indeksy byly, jeszcze raZ!
 	// 0302 w zasadzie nic moze trzeba save?
 	//sendCommand(commandShort, 8);
-	Serial.print("SETTING ROLL=\n");
+	Serial.print("SETTING ROLL=");
+	Serial.print(commandRoll[5]);
+	Serial.print("=\n");
 	sendCommand(commandRoll, 6);
-
+	printReport();
 	// this is starttm
 	//uint8_t commandSave[] = { 0x00, 0x10, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
 	//sendCommand(commandSave, 8);
@@ -436,7 +526,7 @@ void doMovingPitchAndYaw() {
 			}
 		} else {
 			Serial.print(
-					"===========================REACHED PITCH TARGET!!==========================!\n");
+					"===========================REACHED PITCh tARGET!!==========================!\n");
 			isMoving[PITCH_IDX] = false;
 			moveTime = millis();
 		}
@@ -467,74 +557,49 @@ void doMovingPitchAndYaw() {
 
 void doMovingRoll() {
 
-	int yawMove = 0;
 	int rollMove = 0;
 
-	if (isMoving[ROLL_IDX]) {
-		if (abs(desired[ROLL_IDX] - pos360[ROLL_IDX]) > 10) {
-
-			rollMove = 256;
-//			int pitchDirection = getCwOrCcw(desired[PITCH_IDX],
-//					pos360[PITCH_IDX]);
-			if (rollDirection > 0) {
-				rollMove = -256;
-			}
-		} else {
-			Serial.print(
-					"===========================REACHED ROLL TARGET!!==========================!\n");
-			isMoving[ROLL_IDX] = false;
-			moveTime = millis();
-		}
-	}
-
-	if (rollMove != 0 ) {
-
-
-		uint8_t commandZero[] =
-				{ 0x00, 0x11, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
-
-//		uint8_t *commandMove = prepareMoveCommand(commandZero, yawMove,
-//				pitchMove);
+//	if (isMoving[ROLL_IDX]) {
+//		if (abs(desired[ROLL_IDX] - pos360[ROLL_IDX]) > 10) {
 //
-//		sendCommand(commandMove, 8);
-		Serial.print("-----SEND SEND-COMMAND-----------------------!");
-		Serial.print("rollMove=");
-		Serial.print(rollMove);
+//			rollMove = 256;
+////			int pitchDirection = getCwOrCcw(desired[PITCH_IDX],
+////					pos360[PITCH_IDX]);
+//			if (rollDirection > 0) {
+//				rollMove = -256;
+//			}
+//		} else {
+//			Serial.print(
+//					"===========================REACHED ROLL TARGET!!==========================!\n");
+//			isMoving[ROLL_IDX] = false;
+//			moveTime = millis();
+//		}
+//	}
+
+	// if(rollMove != 0)
+	if (isMoving[ROLL_IDX]) {
+
+		setRoll(desired[ROLL_IDX]);
+
+		//delay(2000);
+		isMoving[ROLL_IDX] = false;
+		moveTime = millis();
+		Serial.print("-----SEND ROLL-MOVE-COMMAND-----------------------!");
 		Serial.print("\n");
 
 	}
 
-
-}
-
-void printReport() {
-	Serial.print("CURRENT 360 Y=");
-	Serial.print(pos360[YAW_IDX]);
-	Serial.print(" R=");
-	Serial.print(pos360[ROLL_IDX]);
-	Serial.print(" P=");
-	Serial.print(pos360[PITCH_IDX]);
-	Serial.print("  DESIRED Y=");
-	Serial.print(desired[YAW_IDX]);
-	Serial.print(" R=");
-	Serial.print(desired[ROLL_IDX]);
-	Serial.print(" P=");
-	Serial.print(desired[PITCH_IDX]);
-	Serial.print("  IS_MOVING Y=");
-	Serial.print(isMoving[YAW_IDX]);
-	Serial.print(" R=");
-	Serial.print(isMoving[ROLL_IDX]);
-	Serial.print(" P=");
-	Serial.print(isMoving[PITCH_IDX]);
-	Serial.print("currStep=");
-	Serial.print(currentStep);
-	Serial.print("\n");
 }
 
 void doMoving() {
 
 	doMovingPitchAndYaw();
-	//doMovingRoll();
+	doMovingRoll();
+
+	if (!isMoving[YAW_IDX] && !isMoving[ROLL_IDX] && !isMoving[PITCH_IDX]) {
+
+		switchFrontLED(false);
+	}
 
 }
 
@@ -558,9 +623,9 @@ void loop() {
 
 	//recenterGimbal();
 	//resetGimbal();
-	setRoll();
-	delay(1000);
-	return;
+//	setRoll(3);
+//	delay(1000);
+//	return;
 
 //delay(100);
 	if (wynik) {
@@ -571,14 +636,15 @@ void loop() {
 
 		// not moving - so set the target and get going
 		if (!isMoving[YAW_IDX] && !isMoving[PITCH_IDX]
-				&& (millis() - moveTime > 5000)) {
+				&& (millis() - moveTime > TIME_BETWEEN_STEPS)) {
 
 			moveTime = millis();
 			isMoving[YAW_IDX] = true;
 			isMoving[PITCH_IDX] = true;
+			isMoving[ROLL_IDX] = true;
 
 			currentStep++;
-			if (currentStep == numOfSteps) {
+			if (currentStep == numOfSteps ) {
 				currentStep = 0;
 			}
 
@@ -605,16 +671,16 @@ void loop() {
 					YAW_IDX);
 
 			rollDirection = getCwOrCcw(desired[ROLL_IDX], pos360[ROLL_IDX],
-								ROLL_IDX);
+					ROLL_IDX);
 
 			Serial.print(
 					"SETTING TARGETS!!!========================================");
 
 			printReport();
-
+			switchFrontLED(true);
 		}
 
-		if ((millis() - sendTime > 500)) {
+		if ((millis() - sendTime > TIME_BETWEEN_MOVES)) {
 			sendTime = millis();
 			Serial.print("DO MOVING==================================");
 
