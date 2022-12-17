@@ -27,8 +27,8 @@
 
 namespace {
 
-const int TIME_BETWEEN_STEPS = 5000;
-const int TIME_BETWEEN_MOVES = 500;
+const int TIME_BETWEEN_STEPS = 2000;
+const int TIME_BETWEEN_MOVES = 100;
 
 }
 
@@ -78,17 +78,22 @@ const uint8_t commandShort[] =
 // 0xff,0x44 - powoli sie kreci
 // 500 ms - tez ruch ciagly, wyraznie wolniej
 
-// certain, proved: -2 almost flat, -9, 9 - boundaries
+// certain, proved: -2 almost flat, -8, 8 - boundaries
+// 9 too much
+// asymmetrical, maybe there is some trim?
 
 // YAW, ROLL, PITCH
-const int cameraMovesVector[6][3] = { { 40, 9, 59 }, { 39, -9, 130 }, { 0, -2, 0 }, {
-		0, -7, 0 }, { 0, 0, 0 } };
-//const int cameraMovesVector[6][3] = { { 0, 9, 0 }, { 0, -9, 0 }, { 0, -2, 0 }, {
+const int cameraMovesVector[6][3] = { { 1040, 9, 59 }, { 1039, -9, 130 }, {
+		1001, -2, 0 }, { 0, -7, 0 }, { 0, 0, 0 } };
+//const int cameraMovesVector[6][3] = { { 0, 8, 0 }, { 0, -8, 0 }, { 0, -2, 0 }, {
 //		0, -7, 0 }, { 0, 0, 0 } };
 //const int cameraMovesVector[6][3] = { { 0, 10, -50 }, { -30, -10, 50 }, { 30,
 //	10, -50 }, { 0, 0, 50 } };
 const int numOfSteps = 3;
 int currentStep = -1;
+
+bool gimbReset = false;
+bool calculatedCompensation = false;
 
 int cameraMovesCounter = 0;
 
@@ -112,6 +117,7 @@ int rollDirection;
 double desired[3];
 bool isMoving[3] = { false, false, false };
 double pos360[3];
+double compensation[3] = { 0, 0, 0 };
 
 long sendTime = 0;
 long moveTime = 0;
@@ -163,15 +169,14 @@ void sendCommand(const uint8_t *command, int length) {
 
 void switchFrontLED(bool on) {
 
-
 	if (on) {
 
 		//32 - blue confirmed
-		digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-		digitalWrite(LED_BUILTIN2, LOW);   // turn the LED on (HIGH is the voltage level)
+		digitalWrite(LED_BUILTIN2, HIGH); // turn the LED on (HIGH is the voltage level)
+		digitalWrite(LED_BUILTIN, LOW); // turn the LED on (HIGH is the voltage level)
 	} else {
-		digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
-		digitalWrite(LED_BUILTIN2, HIGH);   // turn the LED on (HIGH is the voltage level)
+		digitalWrite(LED_BUILTIN2, LOW); // turn the LED on (HIGH is the voltage level)
+		digitalWrite(LED_BUILTIN, HIGH); // turn the LED on (HIGH is the voltage level)
 	}
 }
 
@@ -182,7 +187,6 @@ void setup() {
 	gps_serial.begin(115200, SERIAL_8N1, RXD2, TXD2);
 	pinMode(32, OUTPUT);
 	digitalWrite(32, HIGH);   // turn the LED on (HIGH is the voltage level)
-
 
 	//pinMode(14, OUTPUT);
 	//digitalWrite(14 HIGH);   // turn the LED on (HIGH is the voltage level)
@@ -218,7 +222,24 @@ void setup() {
 //				delay(1000);
 //			}
 //		}
+	// 26 - JEDEN BUTTON (lewy)
 
+	while (false) {
+		for (int i = 9; i < 30; i++) {
+			long timer = millis();
+			pinMode(i, INPUT);
+			long current = millis();
+			do {
+				delay(100);
+				Serial.print(i);
+				Serial.print(" ");
+				Serial.print(digitalRead(i));
+				Serial.print("\n");
+				current = millis();
+			} while (timer + 3000 > current);
+
+		}
+	}
 
 	delay(900);
 }
@@ -230,18 +251,43 @@ double feyiuAngleTo360(double angle) {
 	return 360 + angle;
 }
 
+char getMoveStrength(int distance) {
+	return 0xff;
+
+	if (distance > 15)
+		return 0xf2;
+	else if (distance > 8)
+		return 0xc2;
+	else if (distance > 4)
+		return 0x90;
+
+	return 0x40;
+}
+
 uint8_t* prepareMoveCommand(uint8_t *commandZero, int yaw, int pitch) {
 
+	char yawStrength = getMoveStrength(abs(yaw));
+
 	if (yaw > 0)
-		commandZero[4] = 0xff;
+		commandZero[4] = yawStrength;
 	else if (yaw < 0)
+		commandZero[5] = yawStrength;
+	else if (yaw == 0) {
+		commandZero[4] = 0xff;
 		commandZero[5] = 0xff;
+	}
+
+	char pitchStrength = getMoveStrength(abs(pitch));
 
 	// this moves upwards
 	if (pitch > 0)
-		commandZero[6] = 0xff;
+		commandZero[6] = pitchStrength;
 	else if (pitch < 0)
-		commandZero[7] = 0xff;
+		commandZero[7] = pitchStrength;
+	else if (pitch == 0) {
+		commandZero[6] = 0x0;
+		commandZero[7] = 0x0;
+	}
 	return commandZero;
 
 }
@@ -497,14 +543,15 @@ void doMovingPitchAndYaw() {
 	int pitchMove = 0;
 
 	if (isMoving[YAW_IDX]) {
-		if (abs(desired[YAW_IDX] - pos360[YAW_IDX]) > 10) {
+		if (abs(desired[YAW_IDX] - pos360[YAW_IDX]) > 8) {
 
 			Serial.print(
 					"===========================YAW MOVE!!==========================!\n");
-			yawMove = 256;
-			//int yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX]);
-			if (yawDirection > 0) {
-				yawMove = -256;
+
+			yawMove = abs(desired[YAW_IDX] - pos360[YAW_IDX]);
+
+			if (yawDirection < 0) {
+				yawMove *= -1;
 			}
 
 		} else {
@@ -516,14 +563,12 @@ void doMovingPitchAndYaw() {
 		}
 	}
 	if (isMoving[PITCH_IDX]) {
-		if (abs(desired[PITCH_IDX] - pos360[PITCH_IDX]) > 10) {
+		if (abs(desired[PITCH_IDX] - pos360[PITCH_IDX]) > 8) {
+			pitchMove = abs(desired[PITCH_IDX] - pos360[PITCH_IDX]);
 
-			pitchMove = 256;
-//			int pitchDirection = getCwOrCcw(desired[PITCH_IDX],
-//					pos360[PITCH_IDX]);
-			if (pitchDirection > 0) {
-				pitchMove = -256;
-			}
+			if (pitchDirection > 0)
+				pitchMove *= -1;
+
 		} else {
 			Serial.print(
 					"===========================REACHED PITCh tARGET!!==========================!\n");
@@ -531,7 +576,6 @@ void doMovingPitchAndYaw() {
 			moveTime = millis();
 		}
 	}
-
 	if (yawMove != 0 || pitchMove != 0) {
 
 		//if (sendCounter < 400) {
@@ -552,7 +596,7 @@ void doMovingPitchAndYaw() {
 		Serial.print("\n");
 
 	}
-	//sendCounter++;
+//sendCounter++;
 }
 
 void doMovingRoll() {
@@ -576,7 +620,7 @@ void doMovingRoll() {
 //		}
 //	}
 
-	// if(rollMove != 0)
+// if(rollMove != 0)
 	if (isMoving[ROLL_IDX]) {
 
 		setRoll(desired[ROLL_IDX]);
@@ -603,8 +647,25 @@ void doMoving() {
 
 }
 
+void calculateCompensation() {
+
+	compensation[YAW_IDX] = pos360[YAW_IDX];
+
+}
+
 // the loop function runs over and over again forever
 void loop() {
+
+	if (!gimbReset) {
+
+		gimbReset = true;
+
+		recenterGimbal();
+		delay(5000);
+		//resetGimbal();
+		//delay(1000);
+
+	}
 
 	byte bajty[30];
 
@@ -621,8 +682,8 @@ void loop() {
 
 	bool wynik = getGimbalState(g);
 
-	//recenterGimbal();
-	//resetGimbal();
+//recenterGimbal();
+//resetGimbal();
 //	setRoll(3);
 //	delay(1000);
 //	return;
@@ -630,9 +691,17 @@ void loop() {
 //delay(100);
 	if (wynik) {
 
-		pos360[YAW_IDX] = feyiuAngleTo360(g.yaw);
+		pos360[YAW_IDX] = feyiuAngleTo360(g.yaw - compensation[YAW_IDX]);
 		pos360[ROLL_IDX] = feyiuAngleTo360(g.roll);
 		pos360[PITCH_IDX] = feyiuAngleTo360(g.pitch);
+		//Serial.print("g.yaw=");
+		//Serial.print(g.yaw);
+		//Serial.print("\n");
+		if (!calculatedCompensation) {
+			calculatedCompensation = true;
+			calculateCompensation();
+			;
+		}
 
 		// not moving - so set the target and get going
 		if (!isMoving[YAW_IDX] && !isMoving[PITCH_IDX]
@@ -644,7 +713,7 @@ void loop() {
 			isMoving[ROLL_IDX] = true;
 
 			currentStep++;
-			if (currentStep == numOfSteps ) {
+			if (currentStep == numOfSteps) {
 				currentStep = 0;
 			}
 
@@ -658,8 +727,13 @@ void loop() {
 
 			desired[ROLL_IDX] = cameraMovesVector[currentStep][ROLL_IDX];
 
-			desired[YAW_IDX] = normalize360(
-					pos360[YAW_IDX] + cameraMovesVector[currentStep][YAW_IDX]);
+			if (abs(cameraMovesVector[currentStep][YAW_IDX]) < 1000)
+				desired[YAW_IDX] = normalize360(
+						pos360[YAW_IDX]
+								+ cameraMovesVector[currentStep][YAW_IDX]);
+			else
+				desired[YAW_IDX] = cameraMovesVector[currentStep][YAW_IDX]
+						% 1000;
 			desired[PITCH_IDX] = normalize360(
 					pos360[PITCH_IDX]
 							+ cameraMovesVector[currentStep][PITCH_IDX]);
