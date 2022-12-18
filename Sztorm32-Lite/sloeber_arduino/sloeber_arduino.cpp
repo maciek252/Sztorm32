@@ -650,7 +650,16 @@ void doMoving() {
 void calculateCompensation() {
 
 	compensation[YAW_IDX] = pos360[YAW_IDX];
-
+	compensation[ROLL_IDX] = pos360[ROLL_IDX];
+	compensation[PITCH_IDX] = pos360[PITCH_IDX];
+	Serial.println("COMPENSATIONS:");
+	Serial.print("YAW=");
+	Serial.print(compensation[YAW_IDX]);
+	Serial.print(" ROLL=");
+	Serial.print(compensation[ROLL_IDX]);
+	Serial.print(" PITCH=");
+	Serial.print(compensation[PITCH_IDX]);
+	Serial.print("\n");
 }
 
 // the loop function runs over and over again forever
@@ -691,9 +700,11 @@ void loop() {
 //delay(100);
 	if (wynik) {
 
-		pos360[YAW_IDX] = feyiuAngleTo360(g.yaw - compensation[YAW_IDX]);
-		pos360[ROLL_IDX] = feyiuAngleTo360(g.roll);
-		pos360[PITCH_IDX] = feyiuAngleTo360(g.pitch);
+		pos360[YAW_IDX] = feyiuAngleTo360((int)((int)((g.yaw)) - compensation[YAW_IDX]) % 360);;
+		pos360[ROLL_IDX] =feyiuAngleTo360((int)((int)((g.roll)) - compensation[ROLL_IDX]) % 360);;
+				//feyiuAngleTo360(g.roll);//  - compensation[ROLL_IDX];
+		pos360[PITCH_IDX] =feyiuAngleTo360((int)((int)((g.pitch)) - compensation[PITCH_IDX]) % 360);;
+				//feyiuAngleTo360(g.pitch);//  - compensation[PITCH_IDX];
 		//Serial.print("g.yaw=");
 		//Serial.print(g.yaw);
 		//Serial.print("\n");
