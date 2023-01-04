@@ -70,60 +70,6 @@ There are two LEDs. Don't know yet if they are connected to the ESP32 or to some
 ### Known issues
 
 
-### The WG2X protocol between the "motherboard" and the VROOM ESP32
-
-baudrate: 115200
-
-The general format of a frame (in both directions):
-
-(an example frame)
-
-A5 5A 02 0D 03 0D 64 00 59 B4
-
-A5 5A - the start marker
-02 0D - the id (maybe it has some structure)
-03 - number of the argument bytes
-0D 64 00 - the arguments
-59 B4 - the CRC16-XMODEM checksum (without the start marker)
-
-
-#### ESP32->the gimbal's STM32F103
-
-001005ff00000000 - start sending telemetry (gimbal status)
-
-0010050000000000 - stop sending TM
-
-00110500FF000000 - joystick move yaw right (clockwise) 
-FF is the force applied, between FF and 00
-
-0011059000FF0000 - joystick move yaw left (anticlockwise)
-
-00110590000000FF - joystick move pitch down
-001105900000FF00 - joystick move pitch up
-
-(with joystick the balance of the contradictive directions is taken, for example xxxxxxFFFF makes no pitch move)
-
-020D0323F100 - adjust the horizon 
-
-setting the motor strength 
-
-A5 5A 02 0D 03 07 VAL1 VAL2
-
-07, 08, 09 - yaw, roll, pitch (to verify the order)
-
-#### the gimbal's STM32F103 -> ESP32 (gimbal status)
-
-a telemetry frame:
-
-A5 5A 03 10 08 01 
-
-A3 35 - pitch pos
-
-C8 02 - roll pos
-
-F5 BB B8 - yaw pos
-
-CRC1 CRC2
 
 ### Sztorm32-Lite
 
