@@ -1,26 +1,3 @@
-/*
- Blink
-
- Turns an LED on for one second, then off for one second, repeatedly.
-
- Most Arduinos have an on-board LED you can control. On the UNO, MEGA and ZERO
- it is attached to digital pin 13, on MKR1000 on pin 6. LED_BUILTIN is set to
- the correct LED pin independent of which board is used.
- If you want to know what pin the on-board LED is connected to on your Arduino
- model, check the Technical Specs of your board at:
- https://www.arduino.cc/en/Main/Products
-
- modified 8 May 2014
- by Scott Fitzgerald
- modified 2 Sep 2016
- by Arturo Guadalupi
- modified 8 Sep 2016
- by Colby Newman
-
- This example code is in the public domain.
-
- https://www.arduino.cc/en/Tutorial/BuiltInExamples/Blink
- */
 #include "uCRC16XModemLib.h"
 
 #include "Crc16.h"
@@ -35,16 +12,7 @@ const int TIME_BETWEEN_MOVES = 100;
 //Crc 16 library (XModem)
 Crc16 crc2;
 
-// diody dzialaja bez power on!
-// 19 - power on! // chyba nie...
-// 27 - RED LED FRONT
-// 32 led blue CONFIRMED!
-// 12 tez led blue?
-// 14 - no led?
-// 23  - zielona z boku!
-// 34, 35 - no led
-// 21 lub 32 - blue z przodu, mruga!
-// 33 lub 25 - czerwona z boku!
+
 #define LED_BUILTIN 27
 #define LED_BUILTIN2 14
 #define PIN_MAIN_BUTTON 26
@@ -130,7 +98,7 @@ bool setPanningSpeed = false;
 // timelapse:
 //A5 5A 02 0D 03 15 4F 00 87 84
 
-//orientacja:
+//Gimbal frame of reference/angles
 // yaw: USBSIDE: 0/-0
 // ROUNDSIDE -90
 // POWER SWITCHSIDE -180/80
@@ -145,19 +113,9 @@ bool setPanningSpeed = false;
 // horizontal: 0
 // motor up: 45 // motor down: -45
 
-//0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 ,0x58 ,0x02 ,0x71 ,0x67
-//A5 5A 00 11 05 FF 2D 00 00 00 7C 98
-//const unsigned char command[] = {0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 ,0x58 ,0x02 ,0x71 ,0x67};
+
 const uint8_t commandShort[] =
 		{ 0x00, 0x11, 0x05, 0xff, 0x44, 0x00, 0x00, 0x00 };
-// 0xff 0x2d, 0x00, 0,0 - yaw ff- bardzo malo, w lewo
-// 0xff 0x00, 0x00, 0,0 - yaw : - bez ruchu
-// 0xff 0xbb, 0x00, 0,0 - yaw : - ~20 stopni
-// 0xff 0xff, 0x00, 0,0 - yaw : - na początku mało a potem się rozpędza, 90 stopni robi na 4 razy
-// 500 ms - w praktyce ruch ciagly!
-// 0xff 0xaa, 0x00, 0,0 - yaw : - na początku mało a potem się rozpędza, 90 stopni robi na 4 razy
-// 0xff,0x44 - powoli sie kreci
-// 500 ms - tez ruch ciagly, wyraznie wolniej
 
 // certain, proved: -2 almost flat, -8, 8 - boundaries
 // 9 too much
@@ -237,15 +195,11 @@ public:
 
 void sendCommand(const uint8_t *command, int length) {
 
-	//Serial.println(sizeof(command));
-	//Serial.println(command[1], HEX);
 	crc2.clearCrc();
 	for (int j = 0; j < length; j++) {
 		crc2.updateCrc(command[j]);
 	}
 	unsigned short value = crc2.getCrc();
-	//Serial.print("crc = 0x");
-	//Serial.println(value, HEX);
 
 	gps_serial.write((uint8_t*) commandHeader, sizeof(commandHeader));
 	gps_serial.write((uint8_t*) command, length);
@@ -499,7 +453,7 @@ bool getGimbalState(GimbalState &g) {
 					////A5 5A 02 0D 03 0C 00 00 // 03 - index?
 
 					// po 5A tylko 03 10 08?
-					// dwa ostatnie bajty to odpowiedz?
+					// dwa ostatnie bajty to odpowiedz?S
 					// scene EF i pozniej 3e, 3f, 40 - scene?
 					if (messageFirstByte == 0x03 && messageSecondByte == 0x10) {
 						//int pozPitch = pitchFirstByte << 8 + yawSecondByte;
@@ -631,7 +585,6 @@ double getCwOrCcw(double desired, double current, int variant) {
 }
 
 void recenterGimbal() {
-
 	// works!
 	//02 40 02 05 02
 	uint8_t commandRecenter[] = { 0x02, 0x40, 0x02, 0x05, 0x02 };
@@ -680,32 +633,6 @@ void printReport() {
 }
 
 void setRoll(int value) {
-	// CZYLI 02 0D 03 - to set? Czy zależy od indeksu?
-	//02 0D 03 16 - 16 to index
-	// BC 02
-	// dziala! 2003 - w lewo delikatnie
-	// bc02 - nic 9001 - b. delikatnie w prawo!
-	// A001- nic
-	// 845c - mocno w prawo i wariuje!
-	//841c - tez wariuje
-	// druga wazna i ma byc malo!
-	// 8403 - nic zauwazalnego
-// 2003 0 mocniej w lewo
-// 2c03 - nic
-	// 2c01 - prawie plasko
-	// 2f01 - nic
-	// 2004
-	// 2005 - mocniej niz 2003? -
-	// 2007 - zdecydowanie mocniej niz 2003!! koniec polki prawie cm!
-	// 20fe - malo ale w prawo //z grubsza plasko
-	// 20ee tez mocno w prawo
-// 20fa - mocno w prawo!
-
-	// 20xx
-	// fa, ee - mocno w prawo i prawie plasko
-	// 03, fa - pol-lewo i malo prawo
-	// 03, ee- pol-lewo(03) i bardz o mocno w prawo (ee)
-	// 07, ee -mocno w obie strony, ee mocniej
 
 	if (value > 16 || value < -16) {
 		return;
@@ -717,36 +644,22 @@ void setRoll(int value) {
 	else if (value < 0)
 		commandRoll[5] = (char) (256 + value);
 
-	// fd - praktycznie plasko
-	// fa - lekko w prawo
-	// ed - max w prawo
-	// 08 prawie max w lewo
-	// 09 jeszcze mocniej w lewo
+	// fd - almost flat
+	// fa - lightly right
+	// ed - max right
+	// 08 almost max left
+	// 09 even more left
 
-//	if(tempRoll){
-//		commandRoll[5] = 0xee;
-//	}
-	// ee to minusy? ff to zero, i potem w dol
-	// 22xx, 0d, ee - glebokie, 22 nic nie zmienia, chyba less significant byte?
 
 	tempRoll = !tempRoll;
 
-	//commandRoll[3] = 0x16; // to chyba indeks tej operacji
-	//commandRoll[4] = 0x20;
-	//commandRoll[5] = 0x03;
 
-	// 9020 tez nic, nie wiem czy poprzednie dobre? 0302 nie dziala!
-	// zle indeksy byly, jeszcze raZ!
-	// 0302 w zasadzie nic moze trzeba save?
-	//sendCommand(commandShort, 8);
 	Serial.print("SETTING ROLL=");
 	Serial.print(commandRoll[5]);
 	Serial.print("=\n");
 	sendCommand(commandRoll, 6);
 	printReport();
-	// this is starttm
-	//uint8_t commandSave[] = { 0x00, 0x10, 0x05, 0xff, 0x00, 0x00, 0x00, 0x00 };
-	//sendCommand(commandSave, 8);
+
 }
 
 void doMovingPitchAndYaw() {
@@ -929,63 +842,14 @@ bool getFrame(GimbalFrame &frame) {
 
 void readSpeeds() {
 
-	// TAK oppowiedz to jest 03 0d 00, bo tyle razy!
-
-	//0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 , 0xBC , 0x02 , // save????
-
-	// motor strength - 3 arg:
-	// 02 0d 03 07 20 4e
-
-	// odpytanie?
-	// A5 5A 02 0E 01 12 // ?
-	// chyba tak
-	// 07, 08, 09 - motor strengths?
-	// 12 scene smooth etc
-	// 0d - joystick? 0c, 0a, 0b - te same indeksy // c,d - suwaki, a,b - przelaczniki
-	//A5 5A 02 40 02 04 00
-	//       uint8_t commandRecenter[] = { 0x02, 0x40, 0x02, 0x05, 0x02 };
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x40, 0x02, 0x04, 0x01 };
-	//A5 5A 02 0D 03 - 12 01 00 - no i OK, skoro odpowiada!
-
-	// scene :12
-	//A5 5A 02 0E 01 12
-	// horizonatal calibration
-	// przekreślone zero w prawo:
-	// A5 5A - 02 0D 03 16 58 02
-	// w lewo:
-	// A5 5A 02 0D 03 16 0C FE
-
 	const uint8_t commandAskSpeeds[] = { 0x02, 0x0d, 0x03, 0x0A, 0x01, 0x00 };
 	sendCommand(commandAskSpeeds, 6);
 
-//	GimbalFrame frame;
-//	bool wynik = getFrame(frame);
-//	Serial.print("wynik = ");
-//	Serial.print(wynik);
-//	Serial.print("\n");
-//	Serial.print(frame.contents[0], HEX);
-//	Serial.print("\n");
-//	Serial.print(frame.contents[1], HEX);
-//	Serial.print("\n");
-//	Serial.print(frame.contents[2], HEX);
-//	Serial.print("\n");
-//	while (1) {
-//
-//	}
-
-	//A5 5A 02 0D    .Z......  .....Z..
-	//03 0D 00 00 B7 73
-	//A5 5A 02 0D 03 0C 00 00 // 03 - index?
-
-	// save
-	// A5 5A 02 0D 03 0B 01 00 26 F 0b - index, 01 00 - value, save
 }
 
 void readParameter(Parameters parameter) {
-	uint8_t commandAskSpeeds[] = { 0x02, 0x0e, 0x01, 0x09 }; // na to nie odpowiada nic
+	uint8_t commandAskSpeeds[] = { 0x02, 0x0e, 0x01, 0x09 };
 	commandAskSpeeds[3] = (uint8_t) parameter;
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x40, 0x02, 0x04, 0x02}; //- no answer to this
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x0d, 0x03, 0x0B, 0x01, 0x00 }; //- answers  - confirmation?
 	sendCommand(commandAskSpeeds, 4);
 
 }
@@ -993,120 +857,21 @@ void readParameter(Parameters parameter) {
 void setParameter(Parameters parameter, uint8_t valueFirst,
 		uint8_t valueSecond) {
 	//A5 5A 02 0D 03 0C 64 00
-	uint8_t commandAskSpeeds[] = { 0x02, 0x0d, 0x03, 0x0c, 0x64, 0x00 }; // na to nie odpowiada nic
+	uint8_t commandAskSpeeds[] = { 0x02, 0x0d, 0x03, 0x0c, 0x64, 0x00 };
 	commandAskSpeeds[3] = (uint8_t) parameter;
 	commandAskSpeeds[4] = (uint8_t) valueFirst;
 	commandAskSpeeds[5] = (uint8_t) valueSecond;
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x40, 0x02, 0x04, 0x02}; //- no answer to this
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x0d, 0x03, 0x0B, 0x01, 0x00 }; //- answers  - confirmation?
+
 	sendCommand(commandAskSpeeds, 6);
 
 }
 
 void readSpeeds2() {
 
-	// nowy dump:
+	const uint8_t commandAskSpeeds[] = { 0x02, 0x0e, 0x01, 0x0C };
 
-	// kabelki białe - potrzebne do odpytania przez telefon o tab, np timelapse:
-	// timelapse - te dwa (panning speed i tilting speed?
-	// raz wczyta, pozniej pamieta - to chyba pytanie bo tylko jeden bajt?
-	// A5 5A 02 0E 01 09 - tak odpytuje?
-	//  A5 5A 02 0E 01 08
-	// po restarcie gimba wczytuje od nowa
-	// a teraz z zielonego po podłączeniu białych i wejściu na tę kartę:
-
-	// to jest odpowiedz chyba o timelapse
-	// A5 5A 03 0E 04 15 00 57 02 AF C1
-	// A5 5A 03 0E 04 14 00 57 02 1B B7
-
-	// a teraz to samo dla MOTORS:
-	// biale:
-	// A5 5A 02 0E 01 09
-	// A5 5A 02 0E 01 08
-	// // A5 5A 02 0E  01 07
-	//tak!!!  i do FTDI232 podłączamy szary kabelek i nic,
-	// otwieramy karte na tel. i dotykamy szarego bialym i wtedy rusza telemetria
-	// (a więc zapewne biały wychodzi z ESP32 a szary idzie do STM32?)
-	// zielony - z STM32? na poczatek pisze WG2X
-
-	// motor strength, zielony:
-	// pan i tilt polowa, roll axis max
-	// A5 5A 03 0E 04 07 00 20 03
-	// A5 5A 03 0E 04 08 00 20 4E  // ok taką odpowiedź dostalem!!!! tylko chyba bez pierwszego pola?
-	// ANSWER2222!!!!!0 20 4E cos zle z odczytem?
-
-	// A5 5A 03 0E 04 09 00 BE 01
-	// ZGADZA SIE!!! 20 20 i potem BE
-
-	// TAK oppowiedz to jest 03 0d 00, bo tyle razy!
-
-	//0xA5, 0x5A, 0x02 , 0x0D , 0x03 , 0x16 , 0xBC , 0x02 , // save????
-
-	// motor strength - 3 arg:
-	// 02 0d 03 07 20 4e
-
-	// odpytanie?
-	// A5 5A 02 0E 01 12 // ?
-	// chyba tak
-	// 07, 08, 09 - motor strengths?
-	// 12 scene smooth etc
-	// 0d - joystick? 0c, 0a, 0b - te same indeksy // c,d - suwaki, a,b - przelaczniki
-	//A5 5A 02 40 02 04 00
-	//       uint8_t commandRecenter[] = { 0x02, 0x40, 0x02, 0x05, 0x02 };
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x40, 0x02, 0x04, 0x01 };
-	//A5 5A 02 0D 03 - 12 01 00
-	//A5 5A 03 40 01 04
-	// 01 00    ....F..o  >D.c.Z..
-	// 04 8C 13 CE - to odpowiedz?
-
-	// ---------- teraz save
-	//zielony STM32->ESP32
-	//bialy - ESP32->
-	// szary ->STM32
-
-	// TILTING SPEED - od lewa do prawa
-	// ustawienie wartosci: (a moze save?) // a moze odpytanie wartosci?
-	// A5 5A 02 0E 01 0B
-	// A5 5A 02 0E 01 0D
-	// A5 5A 02 0E 01 0A
-	// czy to wystarczy? wartosci jest chyba wiecej?
-	// a to chyba ust. wartosci:
-	// A5 5A 02 0D 03 0A 00 00
-	// chyba tilting speed to 0C! // zakres 00-64? hex?
-	//A5 5A 02 0D 03 0C 64 00
-
-	// sprawdzone - to jest odpytanie?
-	// chyba sa tylko dwa: odpytanie, i zapisz wartosc, jedna po drugiej
-	// ruszanie suwakami nic nie zmienia, tylko lokalnie na tel.
-	// A5 5A 02 0D 03 0C 64 00 (3arg) - zapisz wartosc!
-
-	//const uint8_t commandAskSpeeds[] = { 0x03, 0x40, 0x01, 0x04}; // na to nie odpowiada nic
-	const uint8_t commandAskSpeeds[] = { 0x02, 0x0e, 0x01, 0x0C }; // na to nie odpowiada nic
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x40, 0x02, 0x04, 0x02}; //- no answer to this
-	//const uint8_t commandAskSpeeds[] = { 0x02, 0x0d, 0x03, 0x0B, 0x01, 0x00 }; //- answers  - confirmation?
 	sendCommand(commandAskSpeeds, 4);
 
-//	GimbalFrame frame;
-//	bool wynik = getFrame(frame);
-//	Serial.print("wynik = ");
-//	Serial.print(wynik);
-//	Serial.print("\n");
-//	Serial.print(frame.contents[0], HEX);
-//	Serial.print("\n");
-//	Serial.print(frame.contents[1], HEX);
-//	Serial.print("\n");
-//	Serial.print(frame.contents[2], HEX);
-//	Serial.print("\n");
-//	while (1) {
-//
-//	}
-
-	//A5 5A 02 0D    .Z......  .....Z..
-	//03 0D 00 00 B7 73
-	//A5 5A 02 0D 03 0C 00 00 // 03 - index?
-
-	// save
-	// A5 5A 02 0D 03 0B 01 00 26 F 0b - index, 01 00 - value, save
 }
 
 // the setup function runs once when you press reset or power the board
@@ -1135,11 +900,7 @@ void setup() {
 	sendCounter = 0;
 
 	while (false) {
-		// 19 or so - power off?
-		// 23 green small?
-		// 27 red front
-		// 7, 8 - crash!
-		// 14 green front?
+
 		for (int i = 15; i < 20; i++) {
 			if (i == 7)
 				continue;
@@ -1154,26 +915,8 @@ void setup() {
 			delay(1000);
 		}
 	}
-	// 26 - JEDEN BUTTON (lewy)
 
-	// 16 i 18 i 19 - main power button
-	// 16 tylko gdy jest wlaczone USB, poza tym ciagle 1
-	// 18 - wylaczenie?
-	// 1: 17, 9, 10, 16, 17, 11, 21
-	// analogInput: 12,13,14,15 25, 27, 32, 33, 34
-	// 33 gdy podłączone USB to 0
-	// z odlaczonym USB zatrzymuje sie na 18? TAK!,
-	// 27 i 14 - nie to diody, 16 i 17 - serial, 32 led niebieska, 25 - led czerwona z boku
-	// 15:00 25:77, 27: 286, 12: 283, 13: 113, 14: 247, 15: 133
-	// 15:12 25: 77, 27: 286, 12: 276, 13: 115, 14:252, 32: 400, 33: 60, 34: 1453
-	// 16:49 12: 279, 13: 119, 14: 252, 15: 144, 32: 390, 33: 66, 34: 1350
-	// 17:51  12: 272 13: 117 14 - za duzy rozrzut, 15: 133 32: 400, 33: 66, 34: 1322,
-	// 19:07 34: 1254
-	// 19:16: 34: 1251
-	// 19:45 34: 1231
-	// 19:47 34: 1261 (po podłączeniu USB)
-	// 20:03: 34: 1314
-	// 23:38: 34: 1510
+
 
 	while (false) {
 		for (int i = 9; i < 39; i++) {
