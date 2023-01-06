@@ -35,68 +35,6 @@ enum Parameters {
 bool setTiltingSpeed = false;
 bool setPanningSpeed = false;
 
-// speed:
-// tilting 3/4, panning 50%:
-//  A5 5A 02 0D 03 0D 32 00
-//  0c 4b 00
-// czyli drugi bajt zawsze 00, pierwszy 00-64?
-// reverse tilting control (bool)
-//A5 5A 02 0D 03 0B 00 00
-//
-
-// motor strengh:
-// pan axis max, tilt: 1/3, roll: 50%
-// A5 5A 02 0D 03 07 DB D3
-// A5 5A 02 0D 03 08 2A B2
-// A5 5A 02 0D 03 09 20 4E
-// pan i roll max, tilt 15% (default setting):
-// A5 5A 02 0D 03 07 48 F4 (tilt)
-// A5 5A 02 0D 03 08 20 4E
-// A5 5A 02 0D 03 09 20 4E
-// pan i tilt 40%, roll 80%:
-// A5 5A 02 0D 03 07 8E B8 (tilt)
-// A5 5A 02 0D 03 09 D0 B6 (pan)
-// A5 5A 02 0D 03 08 AA 31
-// pan i roll 50%, tilt 20%:
-// 07 D4 E3
-// 09 D8 10 // 9 to roll?
-// 08 33 0C
-// pan i roll 30%, tilt 50%:
-// 07 33 0C (tilt)
-// 09 14 C7
-// 08 A0 C5
-// pan: 75%, roll 80%, tilt: 30%
-// 09 E2 24 (pan)
-// 08 1e 3c (roll)
-// 07 24 c2 (tilt)
-
-// 15 48 F4
-// 20 D4 E3
-// 40 xx B8
-// 30 xx C7
-// 50 33 0C
-// 75 e2 24
-// 80 aa 31, 1e 3c
-// 100 xx 4e - 100? 4e - 78?
-// srodek to zero!!! w leys w prawo plusy!
-
-//
-
-// max 20 4e
-
-// horizontal calibration from the main page: (it is not permanent compared to the one from the specialized tab?)
-// A5 5A 00 10 - 05 F7 00 00 00 00
-// A5 5A 00 10 - 05 FB 00 00 00 00
-//(lewo-prawo)
-
-// PAN SETTING (main display):
-// A5 5A 02 40 02 04 00 (left button)
-// A5 5A 02 40 02 04 01 (central button)
-// A5 5A 02 40 02 04 03 right button
-
-// horizontal adjustment range - local setting, influences the calibration value
-// timelapse:
-//A5 5A 02 0D 03 15 4F 00 87 84
 
 //Gimbal frame of reference/angles
 // yaw: USBSIDE: 0/-0
@@ -298,15 +236,14 @@ bool getGimbalResponse(uint8_t messageTypeId, uint8_t &firstField,
 		while (gps_serial.available() > 0) {
 
 			serIn = gps_serial.read();  //read Serial
-			//Serial.println(serIn, HEX);
-			//Serial.println("\n");
+
 			if (serIn == 0xA5) {
-				//Serial.print("poczatek ramki!");
+
 				receiveCounter = 1;
 
 				continue;
 			} else if (serIn == 0x5A and receiveCounter == 1) {
-				//Serial.print("frame second byte!");
+
 				receiveCounter = 2;
 				continue;
 			} else if (receiveCounter == 2) {
@@ -383,8 +320,7 @@ bool getGimbalState(GimbalState &g) {
 			thirdField;
 
 	if (gps_serial.available()) {
-		//inform that Arduino heard you saying something
-		//Serial.print("Arduino heard you say: ");
+
 		int serIn;
 		int payloadLength = 0;
 		//keep reading and printing from serial untill there are bytes in the serial buffer
@@ -394,7 +330,7 @@ bool getGimbalState(GimbalState &g) {
 			//Serial.println(serIn, HEX);
 			//Serial.println("\n");
 			if (serIn == 0xA5) {
-				//Serial.print("poczatek ramki!");
+
 				receiveCounter = 1;
 
 				continue;
@@ -509,25 +445,10 @@ bool getGimbalState(GimbalState &g) {
 						while (1) {
 							//	Serial.print("ANSWER2222!!!!!");
 						}
-						// wlacz tm?
-						// przychodzi i bez tm, heartbeat?
-//						Serial.print("03 0E CO TO CO TO? len=0 len=");
-//						Serial.print(payloadLength, HEX);
-//						Serial.print("\n");
-					} else {
-						// 03 0e e
-						// 03 20 0 też bywa
-						// 01 00 00 // gdy gimbal się nie rusza chyba?
-						// 01 01 00
-						// 01 0e 00
 
-						// pan-tilt
-						// A5 5A 02 40 02 04 00  - zadanie
-						//    5A 02 40 02 04 01
-						//    5A 02 40 02 04 03
-						// A5 5A 01 00 04 8C 13 CE 01 -to chyba to?
-						// a odpowiedz 03 40 0?
-						Serial.print("INNE INNE!");
+					} else {
+
+						Serial.print("sth other!");
 						Serial.print(messageFirstByte, HEX);
 						Serial.print("\n");
 						Serial.print(messageSecondByte, HEX);
@@ -798,18 +719,15 @@ bool getFrame(GimbalFrame &frame) {
 
 	int frameCounter = 0;
 	if (gps_serial.available()) {
-		//inform that Arduino heard you saying something
-		//Serial.print("Arduino heard you say: ");
 
 		//keep reading and printing from serial untill there are bytes in the serial buffer
 		while (gps_serial.available() > 0) {
 			int serIn = gps_serial.read();  //read Serial
-			Serial.print("przyszlo = ");
+
 			Serial.print(serIn, HEX);
 			Serial.print("\n");
-			//Serial.println(serIn, HEX);
 			if (serIn == 0xA5) {
-				Serial.print("poczatek ramki!");
+				Serial.print("frame begin!");
 				frameCounter = 1;
 				continue;
 			} else if (serIn == 0x5A and frameCounter == 1) {
@@ -1038,21 +956,18 @@ void loop() {
 		Serial.print("@@@@@@@@@@@@@@@@@@@@@!!START TM=\n");
 	}
 
-	bool wynik = false;
+	bool result = false;
 	GimbalState g;
 
 	//for(int i = 0; i < 100; i++){
 
-	wynik = getGimbalState(g);
+	result = getGimbalState(g);
 
 //recenterGimbal();
 //resetGimbal();
-//	setRoll(3);
-//	delay(1000);
-//	return;
 
-//delay(100);
-	if (wynik) {
+
+	if (result) {
 
 		double temp;
 
@@ -1074,10 +989,7 @@ void loop() {
 		;
 		speed[PITCH_IDX] = abs(temp - pos360[PITCH_IDX]);
 		pos360[PITCH_IDX] = temp;
-		//feyiuAngleTo360(g.pitch);//  - compensation[PITCH_IDX];
-		//Serial.print("g.yaw=");
-		//Serial.print(g.yaw);
-		//Serial.print("\n");
+
 		if (!calculatedCompensation) {
 			calculatedCompensation = true;
 			calculateCompensation();
@@ -1127,14 +1039,6 @@ void loop() {
 						% 1000;
 			}
 
-//			pitchDirection = getCwOrCcw(desired[PITCH_IDX], pos360[PITCH_IDX],
-//					PITCH_IDX);
-
-//			yawDirection = getCwOrCcw(desired[YAW_IDX], pos360[YAW_IDX],
-//					YAW_IDX);
-
-//			rollDirection = getCwOrCcw(desired[ROLL_IDX], pos360[ROLL_IDX],
-//					ROLL_IDX);
 
 			Serial.print(
 					"SETTING TARGETS!!!========================================");
@@ -1152,7 +1056,6 @@ void loop() {
 		}
 	}
 
-//	const char *p_buf = "abcd";
-//	const unsigned int *p_int = reinterpret_cast<const unsigned int*>(p_buf);
+
 }
 
